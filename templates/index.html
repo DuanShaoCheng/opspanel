@@ -183,8 +183,7 @@ const NAV_ICONS={
   history:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
   users:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>',
   settings:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
-  docs:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>',
-  trash:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>'
+  docs:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>'
 };
 
 // === Theme ===
@@ -263,7 +262,6 @@ function buildNav(){
   sysItems.push({id:'llm',label:'LLM',icon:NAV_ICONS.llm});
   sysItems.push({id:'schedule',label:'定时任务',icon:NAV_ICONS.schedule});
   if(isAdmin())sysItems.push({id:'users',label:'用户管理',icon:NAV_ICONS.users});
-  if(isAdmin())sysItems.push({id:'trash',label:'回收站',icon:NAV_ICONS.trash});
   sysItems.push({id:'settings',label:'设置',icon:NAV_ICONS.settings});
   sysItems.push({id:'docs',label:'文档',icon:NAV_ICONS.docs});
   html+=sysItems.map(i=>`<a href="#/${i.id}" data-page="${i.id}">${i.icon}<span>${i.label}</span></a>`).join('');
@@ -285,7 +283,7 @@ function updateSidebar(){
 }
 
 // === Page titles ===
-const PAGE_TITLES={dashboard:'仪表盘',sources:'日志源',collected:'采集日志','log-ai':'AI 配置','log-notify':'推送配置',notifications:'通知渠道',issues:'问题列表',llm:'LLM',schedule:'定时任务',history:'推送记录',trash:'回收站',docs:'文档',users:'用户管理',settings:'设置'};
+const PAGE_TITLES={dashboard:'仪表盘',sources:'日志源',collected:'采集日志','log-ai':'AI 配置','log-notify':'推送配置',notifications:'通知渠道',issues:'问题列表',llm:'LLM',schedule:'定时任务',history:'推送记录',docs:'文档',users:'用户管理',settings:'设置'};
 
 // === Login ===
 async function doLogin(){
@@ -350,7 +348,6 @@ function router(){
     case 'schedule':renderSchedule(app);break;
     case 'history':renderHistory(app);break;
     case 'docs':renderDocs(app);break;
-    case 'trash':renderTrash(app);break;
     case 'users':renderUsers(app);break;
     case 'settings':renderSettings(app);break;
     default:app.innerHTML='<div class="empty"><div class="empty-icon">404</div>页面不存在</div>';
@@ -1222,52 +1219,6 @@ async function testSMTP(){
   const r=await api('/api/test-notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:-1,type:'email',to:email})});
   if(r.error)toast('发送失败: '+r.error,false);else toast('测试邮件已发送',true);
 }
-// === Trash ===
-async function renderTrash(el){
-  const r=await api('/api/trash');
-  const logs=r.logs||[];
-  const jobs=r.jobs||[];
-  const total=logs.length+jobs.length;
-  el.innerHTML=`
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <span style="font-size:.82rem;color:var(--text-muted)">共 ${total} 条已删除项</span>
-      ${total?`<button class="btn btn-sm btn-danger" onclick="purgeAllTrash()">永久清空</button>`:''}
-    </div>
-    ${logs.length?`<div class="card" style="margin-bottom:20px">
-      <div class="card-header"><span class="card-title">日志（${logs.length}）</span><button class="btn btn-sm btn-primary" onclick="restoreTrash('logs',${JSON.stringify(logs.map(l=>l.id))})">全部恢复</button></div>
-      <table class="history-table"><thead><tr><th>ID</th><th>服务器</th><th>级别</th><th>内容</th><th>删除时间</th><th></th></tr></thead>
-      <tbody>${logs.slice(0,50).map(l=>`<tr>
-        <td>${l.id}</td>
-        <td>${esc(l.host||'-')}</td>
-        <td><span class="tag" style="background:${levelColor(l.level)}">${esc(l.level)}</span></td>
-        <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.82rem">${esc(l.content).substring(0,60)}</td>
-        <td style="font-size:.78rem">${esc(l.deleted_at||'').replace('T',' ').substring(0,19)}</td>
-        <td><button class="btn btn-sm btn-outline" onclick="restoreTrash('logs',[${l.id}])">恢复</button></td>
-      </tr>`).join('')}</tbody></table>
-    </div>`:''}
-    ${jobs.length?`<div class="card">
-      <div class="card-header"><span class="card-title">定时任务（${jobs.length}）</span><button class="btn btn-sm btn-primary" onclick="restoreTrash('jobs',${JSON.stringify(jobs.map(j=>j.id))})">全部恢复</button></div>
-      <table class="history-table"><thead><tr><th>ID</th><th>名称</th><th>Cron</th><th>删除时间</th><th></th></tr></thead>
-      <tbody>${jobs.map(j=>`<tr>
-        <td>${j.id}</td>
-        <td>${esc(j.name)}</td>
-        <td><code>${esc(j.cron_expr)}</code></td>
-        <td style="font-size:.78rem">${esc(j.deleted_at||'').replace('T',' ').substring(0,19)}</td>
-        <td><button class="btn btn-sm btn-outline" onclick="restoreTrash('jobs',[${j.id}])">恢复</button></td>
-      </tr>`).join('')}</tbody></table>
-    </div>`:''}
-    ${!total?'<div class="empty"><div class="empty-icon">🗑️</div>回收站为空</div>':''}`;
-}
-async function restoreTrash(type,ids){
-  await api('/api/trash/restore',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,ids})});
-  toast('已恢复',true);router();
-}
-async function purgeAllTrash(){
-  if(!confirm('永久删除回收站中所有内容？此操作不可恢复！'))return;
-  await api('/api/trash',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
-  toast('已清空',true);router();
-}
-
 // === Docs ===
 function renderDocs(el){
   const hash=location.hash;

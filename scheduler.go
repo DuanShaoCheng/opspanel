@@ -9,23 +9,21 @@ import (
   "time"
 
   "github.com/robfig/cron/v3"
-  "gorm.io/gorm"
 )
 
 // Job 定时任务模型
 type Job struct {
-  ID        uint            `gorm:"primaryKey" json:"id"`
-  Name      string          `gorm:"size:128;not null" json:"name"`
-  Module    string          `gorm:"size:64;not null" json:"module"`
-  Handler   string          `gorm:"size:64;not null" json:"handler"`
-  CronExpr  string          `gorm:"size:64;not null" json:"cron_expr"`
-  Enabled   bool            `gorm:"default:false" json:"enabled"`
-  Config    string          `gorm:"type:text" json:"config"`
-  LastRun   *time.Time      `json:"last_run"`
-  LastError string          `gorm:"size:512" json:"last_error"`
-  CreatedAt time.Time       `json:"created_at"`
-  UpdatedAt time.Time       `json:"updated_at"`
-  DeletedAt gorm.DeletedAt  `gorm:"index" json:"deleted_at"`
+  ID        uint       `gorm:"primaryKey" json:"id"`
+  Name      string     `gorm:"size:128;not null" json:"name"`
+  Module    string     `gorm:"size:64;not null" json:"module"`
+  Handler   string     `gorm:"size:64;not null" json:"handler"`
+  CronExpr  string     `gorm:"size:64;not null" json:"cron_expr"`
+  Enabled   bool       `gorm:"default:false" json:"enabled"`
+  Config    string     `gorm:"type:text" json:"config"`
+  LastRun   *time.Time `json:"last_run"`
+  LastError string     `gorm:"size:512" json:"last_error"`
+  CreatedAt time.Time  `json:"created_at"`
+  UpdatedAt time.Time  `json:"updated_at"`
 }
 
 // JobHandler 任务执行函数签名

@@ -78,7 +78,6 @@ func main() {
   RegisterSentinelRoutes(api)
   RegisterLogRoutes(api)
   RegisterSchedulerRoutes(api)
-  RegisterTrashRoutes(api)
 
   log.Printf("[opspanel] listening on %s", listenAddr)
   log.Fatal(r.Run(listenAddr))
