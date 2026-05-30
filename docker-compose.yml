@@ -1,0 +1,44 @@
+# OpsPanel — 运维工具平台
+#
+# 使用方式：
+#   1. 复制 .env.example 为 .env
+#   2. 必填：设置 LOG_DIR 为要监控的日志目录
+#   3. 建议：设置 JWT_SECRET 为随机字符串
+#   4. docker compose up -d
+#   5. 访问 http://localhost:<LISTEN_PORT> 登录（默认 admin / admin123）
+
+services:
+  opspanel:
+    build: .
+    image: opspanel:latest
+    container_name: opspanel
+    restart: unless-stopped
+    ports:
+      - "${LISTEN_PORT:-9090}:9090"
+    volumes:
+      - ./data:/data
+      - ${LOG_DIR:-/var/log}:/mnt/logs:ro
+      - /opt/game7/shared:/mnt/game7:ro
+    environment:
+      TZ: Asia/Shanghai
+      DB_DRIVER: ${DB_DRIVER:-sqlite}
+      DB_DSN: ${DB_DSN:-/data/sentinel.db}
+      JWT_SECRET: ${JWT_SECRET:-log-sentinel-change-me}
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

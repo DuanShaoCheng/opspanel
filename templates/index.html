@@ -1,0 +1,1741 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpsPanel</title>
+<style>
+:root{
+  --primary:#3b82f6;--primary-hover:#2563eb;
+  --success:#22c55e;--warning:#f59e0b;--danger:#ef4444;
+  --sidebar-bg:#1e293b;--sidebar-text:#94a3b8;--sidebar-active:#fff;--sidebar-active-bg:rgba(255,255,255,0.1);
+  --bg:#f1f5f9;--card:#ffffff;--border:#e2e8f0;
+  --text:#1e293b;--text-secondary:#64748b;--text-muted:#94a3b8;
+  --shadow:0 1px 3px rgba(0,0,0,0.1);
+  --sidebar-width:240px;
+}
+[data-theme="dark"]{
+  --sidebar-bg:#0f172a;--sidebar-text:#64748b;--sidebar-active:#f1f5f9;--sidebar-active-bg:rgba(255,255,255,0.08);
+  --bg:#1e293b;--card:#334155;--border:#475569;
+  --text:#f1f5f9;--text-secondary:#94a3b8;--text-muted:#64748b;
+  --shadow:0 1px 3px rgba(0,0,0,0.3);
+}
+[data-sidebar="light"]{--sidebar-bg:#ffffff;--sidebar-text:#64748b;--sidebar-active:var(--primary);--sidebar-active-bg:rgba(59,130,246,0.08)}
+[data-theme="dark"][data-sidebar="light"]{--sidebar-bg:#334155;--sidebar-text:#94a3b8;--sidebar-active:#f1f5f9;--sidebar-active-bg:rgba(255,255,255,0.08)}
+[data-sidebar="auto"]{--sidebar-bg:var(--card);--sidebar-text:var(--text-secondary);--sidebar-active:var(--primary);--sidebar-active-bg:rgba(59,130,246,0.06)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:var(--sidebar-width);background:var(--sidebar-bg);display:flex;flex-direction:column;z-index:100;transition:width .2s,transform .2s;overflow:hidden}
+.sidebar-brand{padding:20px 20px 16px;display:flex;align-items:center;gap:10px;font-size:1.05rem;font-weight:700;color:var(--sidebar-active);white-space:nowrap}
+.sidebar-brand svg{flex-shrink:0}
+.sidebar-nav{flex:1;padding:8px 12px;overflow-y:auto}
+.sidebar-nav .nav-group{margin-bottom:16px}
+.sidebar-nav .nav-group-title{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--sidebar-text);opacity:.5;padding:8px 12px 4px;margin-bottom:2px}
+.sidebar-nav .nav-submenu-toggle{display:flex;align-items:center;gap:10px;padding:0 12px;height:40px;border-radius:8px;color:var(--sidebar-text);font-size:.875rem;cursor:pointer;transition:all .2s;white-space:nowrap;border:none;background:none;width:100%;text-align:left;border-left:3px solid transparent;margin-bottom:2px}
+.sidebar-nav .nav-submenu-toggle:hover{background:var(--sidebar-active-bg);color:var(--sidebar-active)}
+.sidebar-nav .nav-submenu-toggle.open{color:var(--sidebar-active)}
+.sidebar-nav .nav-submenu-toggle svg.toggle-icon{margin-left:auto;transition:transform .2s;opacity:.5;flex-shrink:0}
+.sidebar-nav .nav-submenu-toggle.open svg.toggle-icon{transform:rotate(90deg)}
+.sidebar-nav .nav-submenu{overflow:hidden;max-height:0;transition:max-height .25s ease}
+.sidebar-nav .nav-submenu.open{max-height:400px}
+.sidebar-nav .nav-submenu a{padding-left:38px;height:36px;font-size:.82rem}
+.sidebar-nav a{display:flex;align-items:center;gap:10px;padding:0 12px;height:40px;border-radius:8px;text-decoration:none;color:var(--sidebar-text);font-size:.875rem;transition:all .2s;white-space:nowrap;border-left:3px solid transparent;margin-bottom:2px}
+.sidebar-nav a:hover{background:var(--sidebar-active-bg);color:var(--sidebar-active)}
+.sidebar-nav a.active{background:var(--sidebar-active-bg);color:var(--sidebar-active);border-left-color:var(--primary);font-weight:500}
+.sidebar-nav a svg{flex-shrink:0;opacity:.7}
+.sidebar-nav a.active svg{opacity:1}
+.sidebar-footer{padding:16px;border-top:1px solid rgba(255,255,255,.08)}
+.sidebar-user{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.sidebar-avatar{width:36px;height:36px;border-radius:50%;background:var(--sidebar-active-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sidebar-avatar svg{color:var(--sidebar-text)}
+.sidebar-user-info{overflow:hidden}
+.sidebar-user-name{font-size:.84rem;font-weight:500;color:var(--sidebar-active);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sidebar-user-role{font-size:.72rem;color:var(--sidebar-text)}
+.sidebar-logout{width:100%;padding:8px;border:1px solid rgba(255,255,255,.1);border-radius:8px;background:transparent;color:var(--sidebar-text);font-size:.8rem;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px}
+.sidebar-logout:hover{border-color:var(--danger);color:var(--danger);background:rgba(239,68,68,.08)}
+.hamburger{display:none;position:fixed;top:12px;left:12px;z-index:200;width:40px;height:40px;border-radius:8px;border:1px solid var(--border);background:var(--card);cursor:pointer;align-items:center;justify-content:center}
+.hamburger svg{color:var(--text)}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:99}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%);width:240px}
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-overlay.show{display:block}
+  .hamburger{display:flex}
+  .layout-main{margin-left:0!important}
+  .topbar{padding-left:56px!important}
+}
+.layout-main{margin-left:var(--sidebar-width);min-height:100vh;transition:margin-left .2s}
+.topbar{padding:20px 32px 0;margin-bottom:0}
+.topbar-title{font-size:1.25rem;font-weight:600;color:var(--text)}
+.topbar-breadcrumb{font-size:.8rem;color:var(--text-muted);margin-top:4px}
+.content{max-width:1200px;padding:24px 32px 32px}
+.card{background:var(--card);border-radius:12px;padding:24px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-title{font-size:.92rem;font-weight:600;color:var(--text-secondary)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:var(--card);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+.stat-value{font-size:1.5rem;font-weight:700;color:var(--text)}
+.stat-label{font-size:.78rem;color:var(--text-muted);margin-top:4px}
+.stat-card.ok .stat-value{color:var(--success)}
+.stat-card.err .stat-value{color:var(--danger)}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:.82rem;color:var(--text-secondary);margin-bottom:4px;font-weight:500}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:8px;font-size:.88rem;transition:border-color .2s,box-shadow .2s;background:var(--card);color:var(--text)}
+.form-group input:focus,.form-group textarea:focus,.form-group select:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(59,130,246,.1)}
+.form-group textarea{min-height:80px;resize:vertical}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn{padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-size:.84rem;font-weight:500;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--primary);color:#fff}.btn-primary:hover{background:var(--primary-hover)}
+.btn-success{background:var(--success);color:#fff}.btn-success:hover{opacity:.9}
+.btn-warning{background:var(--warning);color:#fff}.btn-warning:hover{opacity:.9}
+.btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{opacity:.9}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text-secondary)}.btn-outline:hover{border-color:var(--primary);color:var(--primary)}
+.btn-sm{padding:5px 10px;font-size:.78rem}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-group{display:flex;gap:8px;margin-top:16px}
+.list-item{border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:10px;position:relative;transition:box-shadow .2s;background:var(--card)}
+.list-item:hover{box-shadow:0 4px 12px rgba(0,0,0,.06)}
+.list-item-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.list-item-title{font-weight:600;font-size:.9rem}
+.list-item-meta{font-size:.78rem;color:var(--text-muted)}
+.list-item-actions{display:flex;gap:6px}
+.tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.72rem;font-weight:500;color:#fff}
+.tag-feishu{background:#3370ff}.tag-wecom{background:#07c160}.tag-dingtalk{background:#0089ff}.tag-webhook{background:#666}
+.tag-plain{background:#6c757d}.tag-json{background:#0d6efd}.tag-multiline{background:#6f42c1}
+.tag-ok{background:var(--success)}.tag-error{background:var(--danger)}
+.switch{position:relative;width:40px;height:20px;display:inline-block}
+.switch input{opacity:0;width:0;height:0}
+.switch .slider{position:absolute;inset:0;background:#ccc;border-radius:10px;cursor:pointer;transition:.3s}
+.switch .slider::before{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:2px;left:2px;transition:.3s}
+.switch input:checked+.slider{background:var(--primary)}
+.switch input:checked+.slider::before{left:22px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:200}
+.modal-overlay.show{display:flex}
+.modal{background:var(--card);border-radius:12px;padding:24px;width:90%;max-width:520px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);color:var(--text)}
+.modal-title{font-size:1rem;font-weight:600;margin-bottom:16px}
+.toast{position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;color:#fff;font-size:.84rem;display:none;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.toast.show{display:block;animation:slideIn .3s}
+.toast-ok{background:var(--success)}.toast-err{background:var(--danger)}
+@keyframes slideIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.history-table{width:100%;border-collapse:collapse;font-size:.84rem}
+.history-table th{text-align:left;padding:10px 12px;border-bottom:2px solid var(--border);color:var(--text-secondary);font-weight:500}
+.history-table td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text)}
+.history-table tr:hover td{background:var(--sidebar-active-bg)}
+.history-detail{background:var(--bg);padding:12px;border-radius:8px;margin-top:8px;font-size:.82rem;white-space:pre-wrap;max-height:300px;overflow-y:auto;color:var(--text-secondary)}
+.empty{text-align:center;padding:40px;color:var(--text-muted)}
+.empty-icon{font-size:2rem;margin-bottom:8px}
+.login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)}
+.login-card{background:var(--card);border-radius:12px;padding:40px;width:100%;max-width:380px;box-shadow:0 8px 32px rgba(0,0,0,.1)}
+.login-card h2{text-align:center;margin-bottom:8px;font-size:1.2rem;color:var(--text)}
+.login-card .login-subtitle{text-align:center;color:var(--text-muted);font-size:.84rem;margin-bottom:24px}
+.login-card .btn{width:100%;justify-content:center;padding:10px;font-size:.9rem}
+.login-error{color:var(--danger);font-size:.82rem;text-align:center;margin-bottom:12px;min-height:1.2em}
+.settings-section{margin-bottom:32px}
+.settings-section h3{font-size:.95rem;font-weight:600;margin-bottom:16px;color:var(--text)}
+.theme-toggle{display:flex;gap:8px}
+.theme-toggle button{padding:8px 20px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text-secondary);cursor:pointer;font-size:.84rem;transition:all .2s}
+.theme-toggle button.active{border-color:var(--primary);background:var(--primary);color:#fff}
+.color-swatches{display:flex;gap:10px;flex-wrap:wrap}
+.color-swatch{width:36px;height:36px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all .2s;position:relative}
+.color-swatch:hover{transform:scale(1.1)}
+.color-swatch.active{border-color:var(--text);box-shadow:0 0 0 2px var(--bg)}
+.color-swatch.active::after{content:'';position:absolute;inset:4px;border-radius:50%;border:2px solid #fff}
+.page-title{font-size:1.2rem;font-weight:600;margin-bottom:20px;color:var(--text)}
+.role-tag{padding:2px 6px;border-radius:4px;font-size:.72rem;background:var(--primary);color:#fff}
+</style>
+</head>
+<body>
+<button class="hamburger" id="hamburger" onclick="toggleSidebar()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg></button>
+<div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+<aside class="sidebar" id="sidebar" style="display:none">
+  <div class="sidebar-brand"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/></svg><span>OpsPanel</span></div>
+  <nav class="sidebar-nav" id="sidebar-nav"></nav>
+  <div class="sidebar-footer">
+    <div class="sidebar-user">
+      <div class="sidebar-avatar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+      <div class="sidebar-user-info"><div class="sidebar-user-name" id="sidebar-username"></div><div class="sidebar-user-role" id="sidebar-role"></div></div>
+    </div>
+    <button class="sidebar-logout" onclick="logout()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>退出登录</button>
+  </div>
+</aside>
+<div class="layout-main" id="layout-main" style="display:none">
+  <div class="topbar" id="topbar"><div class="topbar-title" id="topbar-title"></div><div class="topbar-breadcrumb" id="topbar-breadcrumb"></div></div>
+  <div class="content" id="app"></div>
+</div>
+<div id="login-container"></div>
+<div class="modal-overlay" id="modal-overlay"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
+<script>let CFG={log_sources:[],notifications:[],llm:{},schedule:{}};
+let STATUS={};
+let HISTORY=[];
+let ISSUES=[];
+let AUTH={token:null,username:'',role:''};
+
+const COLORS={blue:{primary:'#3b82f6',hover:'#2563eb'},purple:{primary:'#8b5cf6',hover:'#7c3aed'},green:{primary:'#22c55e',hover:'#16a34a'},orange:{primary:'#f97316',hover:'#ea580c'},red:{primary:'#ef4444',hover:'#dc2626'},teal:{primary:'#14b8a6',hover:'#0d9488'}};
+
+const NAV_ICONS={
+  dashboard:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>',
+  sources:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+  notifications:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>',
+  issues:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+  llm:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>',
+  schedule:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+  history:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>',
+  users:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>',
+  settings:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>',
+  docs:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>'
+};
+
+// === Theme ===
+function loadTheme(){
+  try{const t=JSON.parse(localStorage.getItem('ops_theme'));if(t)return t;}catch(e){}
+  return{mode:'light',primary:'blue',sidebar:'dark'};
+}
+function applyTheme(theme){
+  const html=document.documentElement;
+  html.setAttribute('data-theme',theme.mode);
+  if(theme.sidebar!=='dark')html.setAttribute('data-sidebar',theme.sidebar);
+  else html.removeAttribute('data-sidebar');
+  const c=COLORS[theme.primary]||COLORS.blue;
+  html.style.setProperty('--primary',c.primary);
+  html.style.setProperty('--primary-hover',c.hover);
+  localStorage.setItem('ops_theme',JSON.stringify(theme));
+}
+let currentTheme=loadTheme();
+applyTheme(currentTheme);
+
+// === Auth ===
+function isAdmin(){return AUTH.role==='admin';}
+function isLoggedIn(){return !!AUTH.token;}
+function loadAuth(){
+  const t=localStorage.getItem('ls_token');
+  const u=localStorage.getItem('ls_username');
+  const r=localStorage.getItem('ls_role');
+  if(t){AUTH.token=t;AUTH.username=u||'';AUTH.role=r||'';}
+}
+function saveAuth(token,username,role){
+  AUTH.token=token;AUTH.username=username;AUTH.role=role;
+  localStorage.setItem('ls_token',token);
+  localStorage.setItem('ls_username',username);
+  localStorage.setItem('ls_role',role);
+}
+function clearAuth(){
+  AUTH={token:null,username:'',role:''};
+  localStorage.removeItem('ls_token');
+  localStorage.removeItem('ls_username');
+  localStorage.removeItem('ls_role');
+}
+function logout(){clearAuth();location.hash='#/login';router();}
+
+// === Sidebar ===
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-overlay').classList.toggle('show');
+}
+function buildNav(){
+  const nav=document.getElementById('sidebar-nav');
+  const curPage=(location.hash||'#/').replace('#/','').split('/')[0]||'dashboard';
+  const logPages=['sources','collected','log-ai','log-notify','history'];
+  const logOpen=logPages.includes(curPage);
+  let html='';
+  // 仪表盘（顶级）
+  html+=`<a href="#/" data-page="dashboard">${NAV_ICONS.dashboard}<span>仪表盘</span></a>`;
+  // 日志分析（可折叠子菜单）
+  html+=`<button class="nav-submenu-toggle ${logOpen?'open':''}" onclick="toggleSubmenu(this)">
+    ${NAV_ICONS.sources}<span>日志分析</span>
+    <svg class="toggle-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>`;
+  html+=`<div class="nav-submenu ${logOpen?'open':''}">`;
+  const logItems=[
+    {id:'sources',label:'日志源',icon:NAV_ICONS.sources},
+    {id:'collected',label:'采集日志',icon:NAV_ICONS.history},
+    {id:'log-ai',label:'AI 配置',icon:NAV_ICONS.llm},
+    {id:'log-notify',label:'推送配置',icon:NAV_ICONS.notifications},
+    {id:'history',label:'推送记录',icon:NAV_ICONS.history},
+  ];
+  html+=logItems.map(i=>`<a href="#/${i.id}" data-page="${i.id}">${i.icon}<span>${i.label}</span></a>`).join('');
+  html+='</div>';
+  // 系统分组
+  html+='<div class="nav-group"><div class="nav-group-title">系统</div>';
+  const sysItems=[];
+  sysItems.push({id:'notifications',label:'通知渠道',icon:NAV_ICONS.notifications});
+  sysItems.push({id:'llm',label:'LLM',icon:NAV_ICONS.llm});
+  sysItems.push({id:'schedule',label:'定时任务',icon:NAV_ICONS.schedule});
+  if(isAdmin())sysItems.push({id:'users',label:'用户管理',icon:NAV_ICONS.users});
+  sysItems.push({id:'settings',label:'设置',icon:NAV_ICONS.settings});
+  sysItems.push({id:'docs',label:'文档',icon:NAV_ICONS.docs});
+  html+=sysItems.map(i=>`<a href="#/${i.id}" data-page="${i.id}">${i.icon}<span>${i.label}</span></a>`).join('');
+  html+='</div>';
+  nav.innerHTML=html;
+}
+function toggleSubmenu(btn){
+  btn.classList.toggle('open');
+  btn.nextElementSibling.classList.toggle('open');
+}
+function updateSidebar(){
+  const sidebar=document.getElementById('sidebar');
+  if(!isLoggedIn()){sidebar.style.display='none';document.getElementById('layout-main').style.display='none';return;}
+  sidebar.style.display='flex';
+  document.getElementById('layout-main').style.display='block';
+  document.getElementById('sidebar-username').textContent=AUTH.username;
+  document.getElementById('sidebar-role').textContent=AUTH.role;
+  buildNav();
+}
+
+// === Page titles ===
+const PAGE_TITLES={dashboard:'仪表盘',sources:'日志源',collected:'采集日志','log-ai':'AI 配置','log-notify':'推送配置',notifications:'通知渠道',issues:'问题列表',llm:'LLM',schedule:'定时任务',history:'推送记录',docs:'文档',users:'用户管理',settings:'设置'};
+
+// === Login ===
+async function doLogin(){
+  const username=document.getElementById('login-user').value.trim();
+  const password=document.getElementById('login-pass').value;
+  const errEl=document.getElementById('login-error');
+  errEl.textContent='';
+  if(!username||!password){errEl.textContent='请输入用户名和密码';return;}
+  try{
+    const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+    const data=await r.json();
+    if(!r.ok){errEl.textContent=data.error||'登录失败';return;}
+    saveAuth(data.token,data.username,data.role);
+    location.hash='#/';
+    await init();
+  }catch(e){errEl.textContent='网络错误';}
+}
+function renderLogin(){
+  document.getElementById('sidebar').style.display='none';
+  document.getElementById('layout-main').style.display='none';
+  document.getElementById('login-container').innerHTML=`
+    <div class="login-wrap">
+      <div class="login-card">
+        <h2>OpsPanel</h2>
+        <p class="login-subtitle">请登录以继续</p>
+        <div class="login-error" id="login-error"></div>
+        <div class="form-group"><label>用户名</label><input id="login-user" placeholder="username" onkeydown="if(event.key==='Enter')doLogin()"></div>
+        <div class="form-group"><label>密码</label><input id="login-pass" type="password" placeholder="password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+        <div class="btn-group" style="margin-top:20px"><button class="btn btn-primary" onclick="doLogin()">登录</button></div>
+      </div>
+    </div>`;
+}
+
+// === Router ===
+function router(){
+  const hash=location.hash||'#/';
+  const page=hash.replace('#/','').split('/')[0]||'dashboard';
+  if(!isLoggedIn()){
+    if(page!=='login')location.hash='#/login';
+    renderLogin();
+    return;
+  }
+  if(page==='login'){location.hash='#/';return;}
+  if(page==='users'&&!isAdmin()){location.hash='#/';return;}
+  document.getElementById('login-container').innerHTML='';
+  updateSidebar();
+  document.querySelectorAll('.sidebar-nav a').forEach(a=>{
+    a.classList.toggle('active',a.dataset.page===page);
+  });
+  document.getElementById('topbar-title').textContent=PAGE_TITLES[page]||page;
+  document.getElementById('topbar-breadcrumb').textContent='首页 / '+(PAGE_TITLES[page]||page);
+  const app=document.getElementById('app');
+  switch(page){
+    case 'dashboard':renderDashboard(app);break;
+    case 'sources':renderSources(app);break;
+    case 'collected':renderCollected(app);break;
+    case 'log-ai':renderLogAI(app);break;
+    case 'log-notify':renderLogNotify(app);break;
+    case 'notifications':renderNotifications(app);break;
+    case 'issues':renderIssues(app);break;
+    case 'llm':renderLLM(app);break;
+    case 'schedule':renderSchedule(app);break;
+    case 'history':renderHistory(app);break;
+    case 'docs':renderDocs(app);break;
+    case 'users':renderUsers(app);break;
+    case 'settings':renderSettings(app);break;
+    default:app.innerHTML='<div class="empty"><div class="empty-icon">404</div>页面不存在</div>';
+  }
+  // close mobile sidebar on navigate
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('show');
+}
+window.onhashchange=router;
+
+// === API ===
+async function api(url,opts={}){
+  if(!opts.headers)opts.headers={};
+  if(AUTH.token)opts.headers['Authorization']='Bearer '+AUTH.token;
+  const r=await fetch(url,opts);
+  if(r.status===401){clearAuth();location.hash='#/login';router();throw new Error('unauthorized');}
+  return r.json();
+}
+async function loadConfig(){CFG=await api('/api/config');}
+async function loadStatus(){STATUS=await api('/api/status');}
+async function loadHistory(){HISTORY=await api('/api/history');}
+async function loadIssues(){ISSUES=await api('/api/issues');}
+async function saveConfig(){
+  await api('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(CFG)});
+  toast('配置已保存',true);
+  await loadConfig();
+  await loadStatus();
+}
+
+// === Toast ===
+function toast(msg,ok){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.className='toast show '+(ok?'toast-ok':'toast-err');
+  setTimeout(()=>el.className='toast',3000);
+}
+
+// === Modal ===
+function showModal(title,html){
+  document.getElementById('modal').innerHTML=`<div class="modal-title">${title}</div>${html}`;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('show');}
+document.getElementById('modal-overlay').onclick=e=>{if(e.target===e.currentTarget)closeModal();};
+
+// === Utils ===
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escHtml(s){return esc(s).replace(/\n/g,'<br>');}
+function fmtTag(f){return`<span class="tag tag-${f||'plain'}">${f||'plain'}</span>`;}
+function chTag(t){return`<span class="tag tag-${t}">${t}</span>`;}
+function stTag(s){return`<span class="tag tag-${s}">${s==='ok'?'成功':'失败'}</span>`;}
+// === Dashboard ===
+function renderDashboard(el){
+  const s=STATUS;
+  const lastOk=s.last_status==='ok';
+  el.innerHTML=`
+    <div class="stats">
+      <div class="stat-card"><div class="stat-value">${s.sources_count||0}</div><div class="stat-label">日志源</div></div>
+      <div class="stat-card"><div class="stat-value">${s.channels_enabled||0}/${s.channels_count||0}</div><div class="stat-label">通知渠道（启用/总数）</div></div>
+      <div class="stat-card ${lastOk?'ok':'err'}"><div class="stat-value">${s.last_status?stTag(s.last_status):'—'}</div><div class="stat-label">上次执行</div></div>
+      <div class="stat-card"><div class="stat-value">${s.llm_configured?'✓':'✗'}</div><div class="stat-label">LLM 状态</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">调度状态</span></div>
+      <p style="font-size:.88rem;color:var(--text-secondary)">
+        ${s.schedule_name?`<b>${esc(s.schedule_name)}</b>：`:' '}${s.schedule_enabled?'<b style="color:var(--success)">已启用</b>':'<b style="color:var(--text-muted)">未启用</b>'}
+        ${s.schedule_cron?` | Cron: <code>${esc(s.schedule_cron)}</code>`:''}
+        ${s.next_run?` | 下次执行: <b>${esc(s.next_run)}</b>`:''}
+      </p>
+      ${s.last_run?`<p style="font-size:.82rem;color:var(--text-muted);margin-top:6px">上次执行: ${esc(s.last_run)}</p>`:''}
+      ${isAdmin()?`<div class="btn-group"><button class="btn btn-primary" onclick="doTrigger()" ${(CFG.notifications||[]).length===0?'disabled title="请先配置通知渠道"':''}>立即执行</button></div>`:''}
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">最近执行记录</span><a href="#/history" style="font-size:.82rem;color:var(--primary);text-decoration:none">查看全部 →</a></div>
+      ${renderRecentHistory(s.recent_history)}
+    </div>`;
+}
+function renderRecentHistory(list){
+  if(!list||!list.length)return'<div class="empty"><div class="empty-icon">📭</div>暂无执行记录</div>';
+  const items=list.slice(0,5);
+  return'<table class="history-table"><thead><tr><th>时间</th><th>状态</th><th>摘要</th></tr></thead><tbody>'
+    +items.map(r=>`<tr><td>${esc(r.time)}</td><td>${stTag(r.status)}</td><td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.summary||r.error||'')}</td></tr>`).join('')
+    +'</tbody></table>';
+}
+async function doTrigger(){
+  await api('/api/trigger',{method:'POST'});
+  toast('已触发分析，稍后刷新查看结果',true);
+  setTimeout(async()=>{await loadStatus();await loadHistory();router();},5000);
+}
+
+// === Log AI Config ===
+function renderLogAI(el){
+  const la=CFG.log_analysis||{};
+  const providers=CFG.llm_providers||[];
+  el.innerHTML=`
+    <div class="card">
+      <div class="card-header"><span class="card-title">AI 分析配置</span></div>
+      <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:16px">配置日志分析模块使用的 LLM 和提示词。用于"采集日志 → AI 分析"功能。</p>
+      <div class="form-group"><label>选择 LLM</label>
+        <select id="la-llm" ${isAdmin()?'':'disabled'}>
+          <option value="">-- 未选择 --</option>
+          ${providers.map(p=>`<option value="${esc(p.id)}" ${la.llm_provider===p.id?'selected':''}>${esc(p.name||p.id)} (${esc(p.model)})</option>`).join('')}
+        </select>
+        ${providers.length===0?`<p style="font-size:.76rem;color:var(--warning);margin-top:4px">请先在「系统 → LLM」中添加配置</p>`:''}
+      </div>
+      <div class="form-group"><label>提示词</label>
+        <textarea id="la-prompt" rows="6" ${isAdmin()?'':'disabled'} placeholder="你是服务器运维专家...">${esc(la.llm_prompt||'')}</textarea>
+        <p style="font-size:.76rem;color:var(--text-muted);margin-top:4px">要求 LLM 返回 JSON: {"score":1-10, "analysis":"说明"}</p>
+      </div>
+      ${isAdmin()?`<div class="btn-group"><button class="btn btn-primary" onclick="saveLogAI()">保存</button></div>`:''}
+    </div>`;
+}
+async function saveLogAI(){
+  const llm_provider=document.getElementById('la-llm').value;
+  const llm_prompt=document.getElementById('la-prompt').value;
+  if(!CFG.log_analysis)CFG.log_analysis={};
+  CFG.log_analysis.llm_provider=llm_provider;
+  CFG.log_analysis.llm_prompt=llm_prompt;
+  await saveConfig();
+  toast('已保存',true);
+}
+
+// === Log Notify Config ===
+function renderLogNotify(el){
+  const la=CFG.log_analysis||{};
+  const channels=CFG.notifications||[];
+  const selectedChannels=la.notify_channels||[];
+  el.innerHTML=`
+    <div class="card">
+      <div class="card-header"><span class="card-title">推送配置</span></div>
+      <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:16px">选择日志分析模块定时推送使用的通知渠道。不选则使用所有启用的渠道。</p>
+      ${channels.length?`<div style="display:flex;flex-direction:column;gap:10px">
+        ${channels.map((ch,i)=>`<label style="display:flex;align-items:center;gap:10px;font-size:.88rem;color:var(--text);cursor:pointer;padding:8px 12px;border:1px solid var(--border);border-radius:8px;transition:all .2s">
+          <input type="checkbox" class="ln-ch" value="${i}" ${selectedChannels.includes(i)?'checked':''} ${isAdmin()?'':'disabled'} style="width:16px;height:16px">
+          <span>${esc(ch.name||ch.type)}</span>
+          <span class="tag tag-${ch.type}" style="font-size:.7rem">${ch.type}</span>
+          ${!ch.enabled?'<span style="font-size:.76rem;color:var(--text-muted)">(已禁用)</span>':''}
+        </label>`).join('')}
+      </div>`:`<p style="font-size:.82rem;color:var(--warning)">请先在「系统 → 通知渠道」中添加配置</p>`}
+    </div>
+    <div class="card" style="margin-top:20px">
+      <div class="card-header"><span class="card-title">消息模板</span></div>
+      <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:16px">自定义推送消息的标题和内容格式。</p>
+      <div class="form-row">
+        <div class="form-group"><label>正常标题</label><input id="ln-title-ok" value="${esc(la.title_ok||'✅ OpsPanel 日志报告 - %s')}" ${isAdmin()?'':'disabled'}><p style="font-size:.72rem;color:var(--text-muted);margin-top:4px">%s = 日期</p></div>
+        <div class="form-group"><label>告警标题</label><input id="ln-title-alert" value="${esc(la.title_alert||'🔍 OpsPanel 日志报告 - %s')}" ${isAdmin()?'':'disabled'}><p style="font-size:.72rem;color:var(--text-muted);margin-top:4px">%s = 日期</p></div>
+      </div>
+      <div class="form-group"><label>正常消息</label><input id="ln-msg-ok" value="${esc(la.msg_ok||'过去 %d 小时无新增错误日志，服务运行正常。')}" ${isAdmin()?'':'disabled'}><p style="font-size:.72rem;color:var(--text-muted);margin-top:4px">%d = 小时数</p></div>
+      <div class="form-group"><label>告警消息头</label><input id="ln-msg-header" value="${esc(la.msg_header||'过去 %d 小时共 %d 条错误日志：')}" ${isAdmin()?'':'disabled'}><p style="font-size:.72rem;color:var(--text-muted);margin-top:4px">第一个 %d = 小时数，第二个 %d = 日志条数</p></div>
+      <div class="form-group"><label>推送记录保留条数</label><input id="ln-history-max" type="number" value="${la.history_max||50}" min="10" max="1000" ${isAdmin()?'':'disabled'}><p style="font-size:.72rem;color:var(--text-muted);margin-top:4px">超出后自动删除最早的记录，默认 50</p></div>
+    </div>
+    ${isAdmin()?`<div class="btn-group" style="margin-top:16px"><button class="btn btn-primary" onclick="saveLogNotify()">保存</button></div>`:''}`;
+}
+async function saveLogNotify(){
+  const checks=document.querySelectorAll('.ln-ch:checked');
+  const notify_channels=Array.from(checks).map(c=>parseInt(c.value));
+  if(!CFG.log_analysis)CFG.log_analysis={};
+  CFG.log_analysis.notify_channels=notify_channels;
+  CFG.log_analysis.title_ok=document.getElementById('ln-title-ok').value;
+  CFG.log_analysis.title_alert=document.getElementById('ln-title-alert').value;
+  CFG.log_analysis.msg_ok=document.getElementById('ln-msg-ok').value;
+  CFG.log_analysis.msg_header=document.getElementById('ln-msg-header').value;
+  CFG.log_analysis.history_max=parseInt(document.getElementById('ln-history-max').value)||50;
+  await saveConfig();
+  toast('已保存',true);
+}
+
+// === Collected Logs ===
+let COLLECTED_PAGE=1;
+async function renderCollected(el){
+  const page=COLLECTED_PAGE;
+  const params=new URLSearchParams(location.hash.split('?')[1]||'');
+  const level=params.get('level')||'';
+  const host=params.get('host')||'';
+  const r=await api(`/api/logs?page=${page}&size=30${level?'&level='+level:''}${host?'&host='+host:''}`);
+  const stats=await api('/api/logs/stats');
+  const hosts=r.hosts||[];
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <span style="font-size:.82rem;color:var(--text-muted)">监控文件: ${stats.tracking_files} | 总条目: ${r.total} | 未分析: ${stats.unanalyzed}</span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <select onchange="filterCollectedHost(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--card);color:var(--text)">
+          <option value="">全部服务器</option>
+          ${hosts.map(h=>`<option value="${esc(h)}" ${h===host?'selected':''}>${esc(h)}</option>`).join('')}
+        </select>
+        <select onchange="filterCollectedLevel(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--card);color:var(--text)">
+          <option value="">全部级别</option>
+          <option value="crash" ${level==='crash'?'selected':''}>crash</option>
+          <option value="error" ${level==='error'?'selected':''}>error</option>
+          <option value="warn" ${level==='warn'?'selected':''}>warn</option>
+          <option value="info" ${level==='info'?'selected':''}>info</option>
+        </select>
+        ${isAdmin()?`<button class="btn btn-sm btn-danger" onclick="batchDeleteLogs()">批量删除</button>
+        <button class="btn btn-sm btn-outline" onclick="clearCollected()">清理已分析</button>`:''}
+      </div>
+    </div>
+    ${r.entries&&r.entries.length?`<div class="card" style="padding:0;overflow:hidden">
+      <table class="history-table">
+        <thead><tr>${isAdmin()?'<th style="width:30px"><input type="checkbox" onchange="toggleAllLogs(this.checked)"></th>':''}<th style="width:140px">时间</th><th style="width:60px">级别</th><th style="width:80px">服务器</th><th style="width:80px">来源</th><th>内容</th><th style="width:60px">评分</th><th style="width:90px"></th></tr></thead>
+        <tbody>${r.entries.map(e=>`<tr style="cursor:pointer" onclick="showLogDetail(${e.id})">
+          ${isAdmin()?`<td onclick="event.stopPropagation()"><input type="checkbox" class="log-chk" value="${e.id}"></td>`:''}
+          <td style="white-space:nowrap;font-size:.78rem">${esc(e.created_at||'').replace('T',' ').substring(0,19)}</td>
+          <td><span class="tag" style="background:${levelColor(e.level)}">${esc(e.level)}</span></td>
+          <td style="font-size:.78rem">${esc(e.host||'-')}</td>
+          <td style="font-size:.78rem">${esc(e.source)}</td>
+          <td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.82rem">${esc(e.content).substring(0,80)}</td>
+          <td>${e.ai_score?`<b style="color:${scoreColor(e.ai_score)}">${e.ai_score}/10</b>`:'-'}</td>
+          <td onclick="event.stopPropagation()" style="display:flex;gap:4px"><button class="btn btn-sm btn-outline" onclick="showLogDetail(${e.id})">详情</button>${isAdmin()?`<button class="btn btn-sm btn-danger" onclick="deleteLog(${e.id})">删除</button>`:''}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:center;gap:8px;margin-top:16px">
+      ${page>1?`<button class="btn btn-sm btn-outline" onclick="COLLECTED_PAGE--;router()">上一页</button>`:''}
+      <span style="font-size:.82rem;color:var(--text-muted);padding:6px">第 ${page} 页 / 共 ${Math.ceil(r.total/30)} 页</span>
+      ${page*30<r.total?`<button class="btn btn-sm btn-outline" onclick="COLLECTED_PAGE++;router()">下一页</button>`:''}
+    </div>`:'<div class="empty"><div class="empty-icon">📋</div>暂无采集到的日志<p style="font-size:.82rem;margin-top:8px">采集器正在监听日志文件，匹配到错误时会自动记录</p></div>'}`;
+}
+function levelColor(l){switch(l){case 'crash':return'#dc2626';case 'error':return'#ea580c';case 'warn':return'#ca8a04';default:return'#6b7280';}}
+function scoreColor(s){if(s>=8)return'#dc2626';if(s>=5)return'#ea580c';if(s>=3)return'#ca8a04';return'#22c55e';}
+function filterCollectedLevel(v){
+  COLLECTED_PAGE=1;
+  const params=new URLSearchParams(location.hash.split('?')[1]||'');
+  if(v)params.set('level',v);else params.delete('level');
+  location.hash='#/collected'+(params.toString()?'?'+params.toString():'');
+  router();
+}
+function filterCollectedHost(v){
+  COLLECTED_PAGE=1;
+  const params=new URLSearchParams(location.hash.split('?')[1]||'');
+  if(v)params.set('host',v);else params.delete('host');
+  location.hash='#/collected'+(params.toString()?'?'+params.toString():'');
+  router();
+}
+async function clearCollected(){if(!confirm('清理所有已分析的日志？'))return;await api('/api/logs',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});toast('已清理',true);router();}
+async function deleteLog(id){
+  if(!confirm('确定删除这条日志？'))return;
+  await api('/api/logs/'+id,{method:'DELETE'});
+  toast('已删除',true);router();
+}
+function toggleAllLogs(checked){document.querySelectorAll('.log-chk').forEach(c=>c.checked=checked);}
+async function batchDeleteLogs(){
+  const ids=Array.from(document.querySelectorAll('.log-chk:checked')).map(c=>parseInt(c.value));
+  if(!ids.length){toast('请先勾选要删除的日志',false);return;}
+  if(!confirm('确定删除选中的 '+ids.length+' 条日志？'))return;
+  await api('/api/logs',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})});
+  toast('已删除 '+ids.length+' 条',true);router();
+}
+async function showLogDetail(id){
+  const e=await api('/api/logs/'+id);
+  showModal('日志详情',`
+    <div style="margin-bottom:12px">
+      <span class="tag" style="background:${levelColor(e.level)}">${esc(e.level)}</span>
+      <span style="font-size:.82rem;color:var(--text-muted);margin-left:8px">${esc(e.created_at||'').replace('T',' ').substring(0,19)}</span>
+      <span style="font-size:.82rem;color:var(--text-muted);margin-left:8px">${esc(e.source)} / ${esc(e.file)}</span>
+      ${e.ai_score?`<span style="margin-left:12px;font-weight:600;color:${scoreColor(e.ai_score)}">评分: ${e.ai_score}/10</span>`:''}
+    </div>
+    <div style="margin-bottom:16px">
+      <h4 style="font-size:.84rem;margin-bottom:6px;color:var(--text-secondary)">匹配行</h4>
+      <div class="history-detail" style="border-left:3px solid ${levelColor(e.level)}">${esc(e.content)}</div>
+    </div>
+    ${e.context?`<div style="margin-bottom:16px">
+      <h4 style="font-size:.84rem;margin-bottom:6px;color:var(--text-secondary)">上下文</h4>
+      <div class="history-detail">${esc(e.context)}</div>
+    </div>`:''}
+    ${e.ai_analysis?`<div style="margin-bottom:16px">
+      <h4 style="font-size:.84rem;margin-bottom:6px;color:var(--text-secondary)">AI 分析</h4>
+      <div class="history-detail" style="border-left:3px solid var(--primary)">${esc(e.ai_analysis)}</div>
+    </div>`:''}
+    <div class="btn-group">
+      ${isAdmin()&&!e.analyzed?`<button class="btn btn-primary" onclick="analyzeLog(${e.id})" ${!STATUS.llm_configured?'disabled title="请先配置 LLM"':''}>🤖 AI 分析</button>`:''}
+      ${isAdmin()&&e.analyzed?`<button class="btn btn-outline" onclick="analyzeLog(${e.id})" ${!STATUS.llm_configured?'disabled title="请先配置 LLM"':''}>🔄 重新分析</button>`:''}
+      <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+    </div>
+  `);
+}
+async function analyzeLog(id){
+  toast('正在分析...',true);
+  try{
+    const r=await api('/api/logs/'+id+'/analyze',{method:'POST'});
+    if(r.error){toast('分析失败: '+r.error,false);return;}
+    toast('分析完成，评分: '+r.score+'/10',true);
+    closeModal();
+    showLogDetail(id);
+  }catch(e){toast('分析失败',false);}
+}
+
+// === Sources ===
+function renderSources(el){
+  const list=CFG.log_sources||[];
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2 class="page-title" style="margin:0">日志源</h2>
+      ${isAdmin()?`<button class="btn btn-primary" onclick="editSource(-1)">+ 添加日志源</button>`:''}
+    </div>
+    ${list.length?list.map((s,i)=>`
+      <div class="list-item">
+        <div class="list-item-header">
+          <span class="list-item-title">${esc(s.name)||'未命名'} ${fmtTag(s.type==='filebeat'?'filebeat':s.format)}</span>
+          <div class="list-item-actions">
+            ${isAdmin()?`<button class="btn btn-sm btn-outline" onclick="testSource(${i})">测试</button>
+            <button class="btn btn-sm btn-outline" onclick="editSource(${i})">编辑</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteSource(${i})">删除</button>`:''}
+          </div>
+        </div>
+        <div class="list-item-meta">
+          ${s.type==='filebeat'?`标识字段: <code>${esc(s.host_field||'host.name')}</code> | `:`路径: <code>${esc(s.path)}</code> | 匹配: <code>${esc(s.pattern)||'*.log'}</code> | `}过滤: <code>${esc(s.filter)||'无'}</code>
+        </div>
+      </div>`).join(''):'<div class="empty"><div class="empty-icon">📂</div>暂无日志源，点击上方按钮添加</div>'}`;
+}
+function editSource(idx){
+  const s=idx>=0?CFG.log_sources[idx]:{name:'',type:'local',path:'/mnt/logs',pattern:'*.log',filter:'ERROR|CRASH|exception|panic|fatal',format:'plain',multiline_pattern:'',json_field:'',json_level_field:'',json_level_filter:'',host_field:''};
+  const title=idx>=0?'编辑日志源':'添加日志源';
+  showModal(title,`
+    <div class="form-row">
+      <div class="form-group"><label>名称</label><input id="m-name" value="${esc(s.name)}"></div>
+      <div class="form-group"><label>类型</label><select id="m-srctype" onchange="toggleSourceType()"><option value="local" ${s.type!=='filebeat'?'selected':''}>本地文件</option><option value="filebeat" ${s.type==='filebeat'?'selected':''}>Filebeat</option></select></div>
+    </div>
+    <div id="m-local-wrap" style="display:${s.type==='filebeat'?'none':'block'}">
+      <div class="form-group"><label>路径（容器内路径）</label><input id="m-path" value="${esc(s.path)}"></div>
+      <div class="form-row">
+        <div class="form-group"><label>文件匹配</label><input id="m-pattern" value="${esc(s.pattern)}" placeholder="*.log"></div>
+        <div class="form-group"><label>日志格式</label><select id="m-format" onchange="toggleSourceFmt()"><option value="plain" ${s.format==='plain'?'selected':''}>纯文本</option><option value="json" ${s.format==='json'?'selected':''}>JSON</option><option value="multiline" ${s.format==='multiline'?'selected':''}>多行</option></select></div>
+      </div>
+    </div>
+    <div id="m-filebeat-wrap" style="display:${s.type==='filebeat'?'block':'none'}">
+      <div class="form-group"><label>服务器标识字段</label><input id="m-host-field" value="${esc(s.host_field||'host.name')}" placeholder="host.name"><p style="font-size:.72rem;color:var(--text-muted);margin-top:4px">Filebeat 文档中提取服务器标识的字段路径，如 host.name 或 fields.server_id</p></div>
+    </div>
+    <div class="form-group"><label>过滤正则</label><input id="m-filter" value="${esc(s.filter)}" placeholder="ERROR|CRASH|exception"></div>
+    <div id="m-fmt-json" style="display:${s.format==='json'?'block':'none'}">
+      <div class="form-row">
+        <div class="form-group"><label>消息字段</label><input id="m-json-field" value="${esc(s.json_field)}" placeholder="message"></div>
+        <div class="form-group"><label>级别字段</label><input id="m-json-level-field" value="${esc(s.json_level_field)}" placeholder="level"></div>
+      </div>
+      <div class="form-group"><label>级别过滤</label><input id="m-json-level-filter" value="${esc(s.json_level_filter)}" placeholder="error|fatal|warn"></div>
+    </div>
+    <div id="m-fmt-ml" style="display:${s.format==='multiline'?'block':'none'}">
+      <div class="form-group"><label>起始正则</label><input id="m-ml-pattern" value="${esc(s.multiline_pattern)}" placeholder="^\\d{4}[-/]"></div>
+    </div>
+    <div class="btn-group"><button class="btn btn-primary" onclick="saveSource(${idx})">保存</button><button class="btn btn-outline" onclick="closeModal()">取消</button></div>
+  `);
+}
+function toggleSourceType(){
+  const t=document.getElementById('m-srctype').value;
+  document.getElementById('m-local-wrap').style.display=t==='filebeat'?'none':'block';
+  document.getElementById('m-filebeat-wrap').style.display=t==='filebeat'?'block':'none';
+}
+function toggleSourceFmt(){
+  const v=document.getElementById('m-format').value;
+  document.getElementById('m-fmt-json').style.display=v==='json'?'block':'none';
+  document.getElementById('m-fmt-ml').style.display=v==='multiline'?'block':'none';
+}
+async function saveSource(idx){
+  const srcType=document.getElementById('m-srctype').value;
+  const s={
+    name:document.getElementById('m-name').value,
+    type:srcType,
+    path:document.getElementById('m-path')?.value||'',
+    pattern:document.getElementById('m-pattern')?.value||'',
+    filter:document.getElementById('m-filter').value,
+    format:document.getElementById('m-format')?.value||'plain',
+    json_field:document.getElementById('m-json-field')?.value||'',
+    json_level_field:document.getElementById('m-json-level-field')?.value||'',
+    json_level_filter:document.getElementById('m-json-level-filter')?.value||'',
+    multiline_pattern:document.getElementById('m-ml-pattern')?.value||'',
+    host_field:document.getElementById('m-host-field')?.value||''
+  };
+  if(srcType==='local'&&!s.path){toast('路径不能为空',false);return;}
+  if(idx>=0)CFG.log_sources[idx]=s;else CFG.log_sources.push(s);
+  await saveConfig();closeModal();router();
+}
+function deleteSource(idx){
+  if(!confirm('确定删除该日志源？'))return;
+  CFG.log_sources.splice(idx,1);
+  saveConfig().then(()=>router());
+}
+async function testSource(idx){
+  const s=CFG.log_sources[idx];
+  toast('正在测试采集...',true);
+  const r=await api('/api/test-collect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(s)});
+  if(r.error){showModal('测试结果',`<p style="color:var(--danger)">${esc(r.error)}</p><div class="btn-group"><button class="btn btn-outline" onclick="closeModal()">关闭</button></div>`);return;}
+  showModal('测试结果',`
+    <p>匹配文件: <b>${r.count}</b> 个 | 匹配行: <b>${r.lines}</b> 行</p>
+    <p style="margin-top:8px;font-size:.82rem;color:var(--text-muted)">文件列表:</p>
+    <ul style="font-size:.8rem;margin:4px 0 12px 16px">${r.files.map(f=>`<li><code>${esc(f)}</code></li>`).join('')}</ul>
+    ${r.samples&&r.samples.length?`<p style="font-size:.82rem;color:var(--text-muted)">样本（最近10条）:</p><div class="history-detail">${r.samples.map(l=>esc(l)).join('\n')}</div>`:''}
+    <div class="btn-group"><button class="btn btn-outline" onclick="closeModal()">关闭</button></div>
+  `);
+}
+
+// === Notifications ===
+function renderNotifications(el){
+  const list=CFG.notifications||[];
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <h2 class="page-title" style="margin:0">通知渠道</h2>
+      ${isAdmin()?`<button class="btn btn-primary" onclick="editNotify(-1)">+ 添加渠道</button>`:''}
+    </div>
+    <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:20px">全局通知配置，所有模块（日志推送、定时任务等）共享这些渠道。</p>
+    ${list.length?list.map((n,i)=>`
+      <div class="list-item">
+        <div class="list-item-header">
+          <span class="list-item-title">${esc(n.name)||'未命名'} ${chTag(n.type)} ${n.enabled?'<span class="tag tag-ok">启用</span>':'<span class="tag" style="background:#ccc">禁用</span>'}</span>
+          <div class="list-item-actions">
+            ${isAdmin()?`<button class="btn btn-sm btn-warning" onclick="testNotify(${i})">测试</button>
+            <button class="btn btn-sm btn-outline" onclick="editNotify(${i})">编辑</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteNotify(${i})">删除</button>`:''}
+          </div>
+        </div>
+        <div class="list-item-meta">Webhook: <code>${esc(n.webhook).substring(0,60)}${n.webhook.length>60?'...':''}</code></div>
+      </div>`).join(''):'<div class="empty"><div class="empty-icon">🔔</div>暂无通知渠道，点击上方按钮添加</div>'}`;
+}
+function editNotify(idx){
+  const n=idx>=0?CFG.notifications[idx]:{type:'feishu',name:'',webhook:'',secret:'',enabled:true};
+  const isEmail=n.type==='email';
+  showModal(idx>=0?'编辑通知渠道':'添加通知渠道',`
+    <div class="form-row">
+      <div class="form-group"><label>类型</label><select id="m-type" onchange="toggleNotifyType()"><option value="feishu" ${n.type==='feishu'?'selected':''}>飞书</option><option value="wecom" ${n.type==='wecom'?'selected':''}>企业微信</option><option value="dingtalk" ${n.type==='dingtalk'?'selected':''}>钉钉</option><option value="email" ${n.type==='email'?'selected':''}>邮件</option><option value="webhook" ${n.type==='webhook'?'selected':''}>通用 Webhook</option></select></div>
+      <div class="form-group"><label>名称</label><input id="m-nname" value="${esc(n.name)}"></div>
+    </div>
+    <div id="m-webhook-wrap" style="display:${isEmail?'none':'block'}">
+      <div class="form-group"><label>Webhook URL</label><input id="m-webhook" value="${isEmail?'':esc(n.webhook)}" placeholder="https://..."></div>
+      <div class="form-group"><label>签名密钥（可选）</label><input id="m-secret" type="password" value="${esc(n.secret)}"></div>
+    </div>
+    <div id="m-email-wrap" style="display:${isEmail?'block':'none'}">
+      <div class="form-group"><label>收件邮箱</label><input id="m-email-to" value="${isEmail?esc(n.webhook):''}" placeholder="admin@example.com"></div>
+      <p style="font-size:.76rem;color:var(--text-muted);margin-top:-8px;margin-bottom:12px">发件邮箱在「设置 → SMTP」中配置</p>
+    </div>
+    <div class="form-group"><label>启用</label><label class="switch"><input type="checkbox" id="m-enabled" ${n.enabled?'checked':''}><span class="slider"></span></label></div>
+    <div class="btn-group"><button class="btn btn-primary" onclick="saveNotify(${idx})">保存</button><button class="btn btn-outline" onclick="closeModal()">取消</button></div>
+  `);
+}
+function toggleNotifyType(){
+  const t=document.getElementById('m-type').value;
+  document.getElementById('m-webhook-wrap').style.display=t==='email'?'none':'block';
+  document.getElementById('m-email-wrap').style.display=t==='email'?'block':'none';
+}
+async function saveNotify(idx){
+  const type=document.getElementById('m-type').value;
+  const webhook=type==='email'?document.getElementById('m-email-to').value:document.getElementById('m-webhook').value;
+  const n={type:type,name:document.getElementById('m-nname').value,webhook:webhook,secret:document.getElementById('m-secret')?.value||'',enabled:document.getElementById('m-enabled').checked};
+  if(!n.webhook){toast('Webhook URL 不能为空',false);return;}
+  if(idx>=0)CFG.notifications[idx]=n;else CFG.notifications.push(n);
+  await saveConfig();closeModal();router();
+}
+function deleteNotify(idx){if(!confirm('确定删除该通知渠道？'))return;CFG.notifications.splice(idx,1);saveConfig().then(()=>router());}
+async function testNotify(idx){
+  toast('正在发送测试消息...',true);
+  const r=await api('/api/test-notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:idx})});
+  if(r.error)toast('发送失败: '+r.error,false);else toast('测试消息已发送',true);
+}
+// === LLM ===
+function renderLLM(el){
+  const providers=CFG.llm_providers||[];
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <h2 class="page-title" style="margin:0">LLM 配置</h2>
+      ${isAdmin()?`<button class="btn btn-primary" onclick="editLLMProvider(-1)">+ 添加</button>`:''}
+    </div>
+    <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:20px">管理 LLM 服务连接。各模块在自己的配置中选择使用哪个。兼容 OpenAI chat/completions 格式。</p>
+    ${providers.length?providers.map((p,i)=>`
+      <div class="list-item">
+        <div class="list-item-header">
+          <span class="list-item-title">${esc(p.name||p.id)} <span style="font-size:.76rem;color:var(--text-muted)">${esc(p.model)}</span></span>
+          <div class="list-item-actions">
+            ${isAdmin()?`<button class="btn btn-sm btn-outline" onclick="testLLMProvider(${i})">测试</button>
+            <button class="btn btn-sm btn-outline" onclick="editLLMProvider(${i})">编辑</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteLLMProvider(${i})">删除</button>`:''}
+          </div>
+        </div>
+        <div class="list-item-meta">ID: <code>${esc(p.id)}</code> | API: <code>${esc(p.api_url).substring(0,50)}</code></div>
+      </div>`).join(''):'<div class="empty"><div class="empty-icon">🤖</div>暂无 LLM 配置，点击上方按钮添加</div>'}`;
+}
+function editLLMProvider(idx){
+  const p=idx>=0?(CFG.llm_providers||[])[idx]:{id:'',name:'',type:'openai',api_url:'',api_key:'',model:''};
+  const title=idx>=0?'编辑 LLM':'添加 LLM';
+  showModal(title,`
+    <div class="form-row">
+      <div class="form-group"><label>ID（唯一标识）</label><input id="m-llm-id" value="${esc(p.id)}" placeholder="deepseek" ${idx>=0?'disabled':''}></div>
+      <div class="form-group"><label>名称</label><input id="m-llm-name" value="${esc(p.name)}" placeholder="DeepSeek"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>协议类型</label><select id="m-llm-type">
+        <option value="openai" ${p.type==='openai'||!p.type?'selected':''}>OpenAI Chat</option>
+        <option value="openai-responses" ${p.type==='openai-responses'?'selected':''}>OpenAI Responses</option>
+        <option value="claude" ${p.type==='claude'?'selected':''}>Claude</option>
+      </select></div>
+      <div class="form-group"><label>模型</label><input id="m-llm-model" value="${esc(p.model)}" placeholder="gpt-4o / claude-sonnet-4-20250514"></div>
+    </div>
+    <div class="form-group"><label>API 地址（Base URL，自动补全路径）</label><input id="m-llm-url" value="${esc(p.api_url)}" placeholder="https://api.openai.com/v1">
+      <p style="font-size:.76rem;color:var(--text-muted);margin-top:4px">Chat: 补 /chat/completions | Responses: 补 /responses | Claude: 补 /v1/messages</p>
+    </div>
+    <div class="form-group"><label>API Key</label><input id="m-llm-key" type="password" value="${esc(p.api_key)}" placeholder="sk-xxx"></div>
+    <div class="btn-group"><button class="btn btn-primary" onclick="saveLLMProvider(${idx})">保存</button><button class="btn btn-outline" onclick="closeModal()">取消</button></div>
+  `);
+}
+async function saveLLMProvider(idx){
+  const p={id:document.getElementById('m-llm-id').value.trim(),name:document.getElementById('m-llm-name').value,type:document.getElementById('m-llm-type').value,api_url:document.getElementById('m-llm-url').value,api_key:document.getElementById('m-llm-key').value,model:document.getElementById('m-llm-model').value};
+  if(!p.id||!p.api_url){toast('ID 和 API 地址不能为空',false);return;}
+  if(!CFG.llm_providers)CFG.llm_providers=[];
+  if(idx>=0){CFG.llm_providers[idx]=p;}else{CFG.llm_providers.push(p);}
+  await saveConfig();closeModal();router();
+}
+function deleteLLMProvider(idx){
+  if(!confirm('确定删除？'))return;
+  CFG.llm_providers.splice(idx,1);
+  saveConfig().then(()=>router());
+}
+async function testLLMProvider(idx){
+  toast('正在测试...',true);
+  const r=await api('/api/test-llm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:idx})});
+  if(r.error)toast('失败: '+r.error,false);else toast('连接成功: '+r.reply,true);
+}
+
+// === Schedule ===
+let JOBS=[];
+let JOB_HANDLERS=[];
+let JOB_MODULES=[];
+async function loadJobs(){
+  JOBS=await api('/api/jobs');
+  JOB_HANDLERS=await api('/api/jobs/handlers');
+  JOB_MODULES=await api('/api/jobs/modules');
+}
+function renderSchedule(el){
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2 class="page-title" style="margin:0">定时任务</h2>
+      ${isAdmin()?`<button class="btn btn-primary" onclick="editJob(null)">+ 创建任务</button>`:''}
+    </div>
+    ${JOBS.length?`<div class="card">${JOBS.map(j=>`
+      <div class="list-item" style="margin-bottom:12px">
+        <div class="list-item-header">
+          <span class="list-item-title">${esc(j.name)} <span class="tag" style="background:var(--text-muted)">${esc(j.module)}</span></span>
+          <div class="list-item-actions">
+            ${isAdmin()?`<label class="switch" style="margin-right:8px" title="${j.enabled?'点击禁用':'点击启用'}"><input type="checkbox" ${j.enabled?'checked':''} onchange="toggleJob(${j.id},this.checked)"><span class="slider"></span></label>
+            <button class="btn btn-sm btn-success" onclick="runJob(${j.id})" ${j.handler==='log-analysis'&&(CFG.notifications||[]).length===0?'disabled title="请先配置通知渠道"':''}>执行</button>
+            <button class="btn btn-sm btn-outline" onclick="editJob(${j.id})">编辑</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteJob(${j.id})">删除</button>`:''}
+          </div>
+        </div>
+        <div class="list-item-meta">
+          Cron: <code>${esc(j.cron_expr)}</code>
+          ${j.next_run?` | 下次: <b>${esc(j.next_run)}</b>`:''}
+          ${j.last_run?` | 上次: ${esc(j.last_run.replace('T',' ').substring(0,19))}`:''}
+          ${j.last_error?` | <span style="color:var(--danger)">错误: ${esc(j.last_error).substring(0,50)}</span>`:''}
+        </div>
+      </div>`).join('')}</div>`:'<div class="empty"><div class="empty-icon">⏰</div>暂无定时任务</div>'}`;
+}
+function editJob(id){
+  const j=id?JOBS.find(x=>x.id===id):null;
+  const isEdit=!!j;
+  const title=isEdit?'编辑任务':'创建任务';
+  const name=j?j.name:'';
+  const module=j?j.module:'log-analysis';
+  const handler=j?j.handler:'log-analysis';
+  const cronExpr=j?j.cron_expr:'0 9 * * *';
+  const enabled=j?j.enabled:true;
+  const config=j?j.config:'{"log_hours":24,"max_bytes":12000}';
+  showModal(title,`
+    <div class="form-group"><label>任务名称</label><input id="m-jname" value="${esc(name)}"></div>
+    <div class="form-row">
+      <div class="form-group"><label>模块</label><select id="m-jmodule">${JOB_MODULES.map(m=>`<option value="${esc(m.value)}" ${m.value===module?'selected':''}>${esc(m.label)}</option>`).join('')}</select></div>
+      <div class="form-group"><label>Handler</label><select id="m-jhandler">${JOB_HANDLERS.map(h=>`<option value="${esc(h.value)}" ${h.value===handler?'selected':''}>${esc(h.label)}</option>`).join('')}</select></div>
+    </div>
+    <div class="form-group"><label>Cron 表达式</label><input id="m-jcron" value="${esc(cronExpr)}" placeholder="0 9 * * *"><p style="font-size:.76rem;color:var(--text-muted);margin-top:4px">分 时 日 月 周 | 0 9 * * * = 每天9点 | */30 * * * * = 每30分钟</p></div>
+    <div class="form-group"><label>启用</label><label class="switch"><input type="checkbox" id="m-jenabled" ${enabled?'checked':''}><span class="slider"></span></label></div>
+    <div class="form-group"><label>参数 (JSON)</label><textarea id="m-jconfig" rows="3" style="font-family:monospace;font-size:.8rem">${esc(config)}</textarea></div>
+    <div class="btn-group"><button class="btn btn-primary" onclick="saveJob(${id||'null'})">${isEdit?'保存':'创建'}</button><button class="btn btn-outline" onclick="closeModal()">取消</button></div>
+  `);
+}
+async function saveJob(id){
+  const data={
+    name:document.getElementById('m-jname').value,
+    module:document.getElementById('m-jmodule').value,
+    handler:document.getElementById('m-jhandler').value,
+    cron_expr:document.getElementById('m-jcron').value,
+    enabled:document.getElementById('m-jenabled').checked,
+    config:document.getElementById('m-jconfig').value
+  };
+  if(!data.name||!data.cron_expr){toast('名称和 Cron 不能为空',false);return;}
+  try{
+    if(id){
+      await api('/api/jobs/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    }else{
+      await api('/api/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    }
+    toast('已保存',true);closeModal();await loadJobs();router();
+  }catch(e){}
+}
+async function deleteJob(id){
+  if(!confirm('确定删除该任务？'))return;
+  await api('/api/jobs/'+id,{method:'DELETE'});
+  toast('已删除',true);await loadJobs();router();
+}
+async function toggleJob(id,enabled){
+  await api('/api/jobs/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled})});
+  toast(enabled?'已启用':'已禁用',true);await loadJobs();router();
+}
+async function runJob(id){
+  const r=await api('/api/jobs/'+id+'/run',{method:'POST'});
+  if(r.error)toast(r.error,false);else toast('已触发执行',true);
+}
+
+// === History ===
+function renderHistory(el){
+  const list=HISTORY||[];
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <span style="font-size:.82rem;color:var(--text-muted)">共 ${list.length} 条记录</span>
+      ${isAdmin()&&list.length?`<button class="btn btn-sm btn-danger" onclick="clearHistory()">清空记录</button>`:''}
+    </div>
+    <div class="card">
+      ${list.length?`<table class="history-table"><thead><tr><th>时间</th><th>状态</th><th>摘要</th><th></th></tr></thead><tbody>
+        ${list.map((r,i)=>`<tr><td style="white-space:nowrap">${esc(r.time)}</td><td>${stTag(r.status)}</td><td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.summary||r.error||'—')}</td><td><button class="btn btn-sm btn-outline" onclick="showHistDetail(${i})">详情</button></td></tr>`).join('')}
+      </tbody></table>`:'<div class="empty"><div class="empty-icon">📭</div>暂无执行记录</div>'}
+    </div>`;
+}
+async function clearHistory(){
+  if(!confirm('确定清空所有推送记录？'))return;
+  await api('/api/history',{method:'DELETE'});
+  toast('已清空',true);await loadHistory();router();
+}
+function showHistDetail(idx){
+  const r=HISTORY[idx];
+  showModal('执行详情',`
+    <p><b>时间:</b> ${esc(r.time)} | <b>状态:</b> ${stTag(r.status)}</p>
+    ${r.error?`<p style="color:var(--danger);margin-top:8px"><b>错误:</b> ${esc(r.error)}</p>`:''}
+    ${r.summary?`<div class="history-detail" style="margin-top:12px">${escHtml(r.summary)}</div>`:''}
+    <div class="btn-group"><button class="btn btn-outline" onclick="closeModal()">关闭</button></div>
+  `);
+}
+
+// === Issues ===
+function prioColor(p){
+  switch(p){case 'P0':return'#dc2626';case 'P1':return'#ea580c';case 'P2':return'#ca8a04';default:return'#6b7280';}
+}
+function renderIssues(el){
+  const list=(ISSUES||[]).sort((a,b)=>{
+    const order={P0:0,P1:1,P2:2,P3:3};
+    return(order[a.priority]||9)-(order[b.priority]||9);
+  });
+  const open=list.filter(i=>i.status==='open');
+  const resolved=list.filter(i=>i.status==='resolved');
+  el.innerHTML=`
+    <h2 class="page-title">问题列表 <span style="font-size:.82rem;color:var(--text-muted);font-weight:normal">${open.length} 个待处理</span></h2>
+    ${open.length?open.map((iss,i)=>`
+      <div class="list-item" style="border-left:4px solid ${prioColor(iss.priority)}">
+        <div class="list-item-header">
+          <span class="list-item-title"><span class="tag" style="background:${prioColor(iss.priority)}">${esc(iss.priority)}</span> ${esc(iss.title)}</span>
+          <div class="list-item-actions">
+            <button class="btn btn-sm btn-outline" onclick="showIssueDetail('${esc(iss.id)}')">详情</button>
+            <button class="btn btn-sm btn-success" onclick="resolveIssue('${esc(iss.id)}')">已解决</button>
+          </div>
+        </div>
+        <div class="list-item-meta">${esc(iss.time)} | 影响: ${esc(iss.impact).substring(0,60)}</div>
+      </div>`).join(''):'<div class="empty"><div class="empty-icon">✅</div>暂无待处理问题</div>'}
+    ${resolved.length?`
+      <details style="margin-top:20px"><summary style="cursor:pointer;color:var(--text-muted);font-size:.88rem">已解决 (${resolved.length})</summary>
+      <div style="margin-top:10px">${resolved.map(iss=>`
+        <div class="list-item" style="opacity:.6;border-left:4px solid #ccc">
+          <div class="list-item-header">
+            <span class="list-item-title"><span class="tag" style="background:#999">${esc(iss.priority)}</span> <s>${esc(iss.title)}</s></span>
+            <button class="btn btn-sm btn-outline" onclick="showIssueDetail('${esc(iss.id)}')">详情</button>
+          </div>
+          <div class="list-item-meta">${esc(iss.time)}</div>
+        </div>`).join('')}</div></details>`:''}`;
+}
+function showIssueDetail(id){
+  const iss=(ISSUES||[]).find(i=>i.id===id);
+  if(!iss)return;
+  showModal(`[${iss.priority}] ${esc(iss.title)}`,`
+    <div style="margin-bottom:12px"><span class="tag" style="background:${prioColor(iss.priority)}">${esc(iss.priority)}</span> <span style="font-size:.82rem;color:var(--text-muted)">${esc(iss.time)}</span></div>
+    <div style="margin-bottom:16px">
+      <h4 style="font-size:.88rem;margin-bottom:6px">原因分析</h4>
+      <p style="font-size:.84rem;color:var(--text-secondary)">${escHtml(iss.cause)}</p>
+    </div>
+    <div style="margin-bottom:16px">
+      <h4 style="font-size:.88rem;margin-bottom:6px">影响范围</h4>
+      <p style="font-size:.84rem;color:var(--text-secondary)">${escHtml(iss.impact)}</p>
+    </div>
+    <div style="margin-bottom:16px">
+      <h4 style="font-size:.88rem;margin-bottom:6px">日志原文</h4>
+      <div class="history-detail">${esc(iss.raw_log)}</div>
+    </div>
+    <div class="btn-group">
+      ${iss.status==='open'?`<button class="btn btn-success" onclick="resolveIssue('${esc(iss.id)}');closeModal();">标记已解决</button>`:''}
+      <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+    </div>
+  `);
+}
+async function resolveIssue(id){
+  await api('/api/issues',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,status:'resolved'})});
+  await loadIssues();
+  router();
+  toast('已标记为解决',true);
+}
+
+// === Users ===
+let USERS=[];
+async function loadUsers(){USERS=await api('/api/users');}
+function renderUsers(el){
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2 class="page-title" style="margin:0">用户管理</h2>
+      <button class="btn btn-primary" onclick="editUser(null)">+ 创建用户</button>
+    </div>
+    <div class="card">
+      ${USERS.length?`<table class="history-table"><thead><tr><th>用户名</th><th>角色</th><th>创建时间</th><th>操作</th></tr></thead><tbody>
+        ${USERS.map(u=>`<tr>
+          <td>${esc(u.username)}</td>
+          <td><span class="role-tag" style="display:inline-block;padding:2px 6px;border-radius:4px;font-size:.72rem;background:${u.role==='admin'?'var(--primary)':'var(--success)'};color:#fff">${esc(u.role)}</span></td>
+          <td>${esc(u.created_at||'')}</td>
+          <td>
+            <button class="btn btn-sm btn-outline" onclick="editUserRole(${u.id})">改角色</button>
+            <button class="btn btn-sm btn-warning" onclick="resetUserPwd(${u.id})">重置密码</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id},'${esc(u.username)}')">删除</button>
+          </td>
+        </tr>`).join('')}
+      </tbody></table>`:'<div class="empty"><div class="empty-icon">👤</div>暂无用户</div>'}
+    </div>`;
+}
+function editUser(){
+  showModal('创建用户',`
+    <div class="form-group"><label>用户名</label><input id="m-uname" placeholder="username"></div>
+    <div class="form-group"><label>密码</label><input id="m-upass" type="password" placeholder="password"></div>
+    <div class="form-group"><label>角色</label><select id="m-urole"><option value="viewer">viewer</option><option value="admin">admin</option></select></div>
+    <div class="btn-group"><button class="btn btn-primary" onclick="doCreateUser()">创建</button><button class="btn btn-outline" onclick="closeModal()">取消</button></div>
+  `);
+}
+async function doCreateUser(){
+  const username=document.getElementById('m-uname').value.trim();
+  const password=document.getElementById('m-upass').value;
+  const role=document.getElementById('m-urole').value;
+  if(!username||!password){toast('用户名和密码不能为空',false);return;}
+  try{
+    await api('/api/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,role})});
+    toast('用户已创建',true);closeModal();await loadUsers();router();
+  }catch(e){}
+}
+function editUserRole(id){
+  const u=USERS.find(x=>x.id===id);if(!u)return;
+  showModal('修改角色',`
+    <p>用户: <b>${esc(u.username)}</b></p>
+    <div class="form-group" style="margin-top:12px"><label>角色</label><select id="m-urole2"><option value="viewer" ${u.role==='viewer'?'selected':''}>viewer</option><option value="admin" ${u.role==='admin'?'selected':''}>admin</option></select></div>
+    <div class="btn-group"><button class="btn btn-primary" onclick="doUpdateUser(${id},{role:document.getElementById('m-urole2').value})">保存</button><button class="btn btn-outline" onclick="closeModal()">取消</button></div>
+  `);
+}
+function resetUserPwd(id){
+  const u=USERS.find(x=>x.id===id);if(!u)return;
+  showModal('重置密码',`
+    <p>用户: <b>${esc(u.username)}</b></p>
+    <div class="form-group" style="margin-top:12px"><label>新密码</label><input id="m-newpwd" type="password" placeholder="新密码"></div>
+    <div class="btn-group"><button class="btn btn-primary" onclick="doUpdateUser(${id},{password:document.getElementById('m-newpwd').value})">保存</button><button class="btn btn-outline" onclick="closeModal()">取消</button></div>
+  `);
+}
+async function doUpdateUser(id,data){
+  if(data.password&&!data.password.trim()){toast('密码不能为空',false);return;}
+  try{
+    await api('/api/users/'+id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    toast('已更新',true);closeModal();await loadUsers();router();
+  }catch(e){}
+}
+async function deleteUser(id,name){
+  if(!confirm('确定删除用户 '+name+' ？'))return;
+  try{
+    await api('/api/users/'+id,{method:'DELETE'});
+    toast('已删除',true);await loadUsers();router();
+  }catch(e){}
+}
+// === Settings ===
+function renderSettings(el){
+  const t=currentTheme;
+  el.innerHTML=`
+    <div class="settings-section">
+      <h3>外观</h3>
+      <div class="card">
+        <div class="form-group"><label>主题模式</label>
+          <div class="theme-toggle">
+            <button class="${t.mode==='light'?'active':''}" onclick="setThemeMode('light')">亮色</button>
+            <button class="${t.mode==='dark'?'active':''}" onclick="setThemeMode('dark')">暗色</button>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:20px"><label>主色调</label>
+          <div class="color-swatches">
+            <div class="color-swatch ${t.primary==='blue'?'active':''}" style="background:#3b82f6" onclick="setThemeColor('blue')" title="蓝"></div>
+            <div class="color-swatch ${t.primary==='purple'?'active':''}" style="background:#8b5cf6" onclick="setThemeColor('purple')" title="紫"></div>
+            <div class="color-swatch ${t.primary==='green'?'active':''}" style="background:#22c55e" onclick="setThemeColor('green')" title="绿"></div>
+            <div class="color-swatch ${t.primary==='orange'?'active':''}" style="background:#f97316" onclick="setThemeColor('orange')" title="橙"></div>
+            <div class="color-swatch ${t.primary==='red'?'active':''}" style="background:#ef4444" onclick="setThemeColor('red')" title="红"></div>
+            <div class="color-swatch ${t.primary==='teal'?'active':''}" style="background:#14b8a6" onclick="setThemeColor('teal')" title="青"></div>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:20px"><label>侧边栏样式</label>
+          <div class="theme-toggle">
+            <button class="${t.sidebar==='dark'?'active':''}" onclick="setThemeSidebar('dark')">深色</button>
+            <button class="${t.sidebar==='light'?'active':''}" onclick="setThemeSidebar('light')">浅色</button>
+            <button class="${t.sidebar==='auto'?'active':''}" onclick="setThemeSidebar('auto')">跟随主题</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${isAdmin()?`<div class="settings-section">
+      <h3>邮件 (SMTP)</h3>
+      <div class="card">
+        <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:16px">配置发件邮箱，用于邮件通知渠道</p>
+        <div class="form-row">
+          <div class="form-group"><label>SMTP 服务器</label><input id="set-smtp-host" value="${esc(CFG.smtp?.host||'')}" placeholder="smtp.qq.com"></div>
+          <div class="form-group"><label>端口</label><input id="set-smtp-port" type="number" value="${CFG.smtp?.port||465}" placeholder="465"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>用户名</label><input id="set-smtp-user" value="${esc(CFG.smtp?.username||'')}" placeholder="your@email.com"></div>
+          <div class="form-group"><label>密码/授权码</label><input id="set-smtp-pass" type="password" value="${esc(CFG.smtp?.password||'')}" placeholder="授权码"></div>
+        </div>
+        <div class="form-group"><label>发件人地址</label><input id="set-smtp-from" value="${esc(CFG.smtp?.from||'')}" placeholder="留空则使用用户名"></div>
+        <div class="form-group"><label>SSL/TLS (端口465)</label><label class="switch"><input type="checkbox" id="set-smtp-ssl" ${CFG.smtp?.ssl?'checked':''}><span class="slider"></span></label></div>
+        <div class="btn-group"><button class="btn btn-primary" onclick="saveSMTP()">保存</button><button class="btn btn-outline" onclick="testSMTP()">测试发送</button></div>
+      </div>
+    </div>`:''}
+    <div class="settings-section">
+      <h3>账号</h3>
+      <div class="card">
+        <p style="font-size:.88rem;color:var(--text-secondary);margin-bottom:16px">修改密码</p>
+        <div class="form-group"><label>当前密码</label><input id="set-oldpwd" type="password" placeholder="当前密码"></div>
+        <div class="form-group"><label>新密码</label><input id="set-newpwd" type="password" placeholder="新密码"></div>
+        <div class="btn-group"><button class="btn btn-primary" onclick="changePassword()">修改密码</button></div>
+      </div>
+    </div>
+    <div class="settings-section">
+      <h3>关于</h3>
+      <div class="card">
+        <p style="font-size:.88rem;color:var(--text-secondary)"><b>OpsPanel</b> — 运维工具平台</p>
+        <p style="font-size:.82rem;color:var(--text-muted);margin-top:8px">技术栈: Go + 纯 HTML/CSS/JS SPA</p>
+        <p style="font-size:.82rem;color:var(--text-muted);margin-top:4px">部署: Docker 容器化</p>
+        <p style="font-size:.82rem;color:var(--text-muted);margin-top:4px"><a href="#/docs" style="color:var(--primary);text-decoration:none">查看完整文档 →</a></p>
+      </div>
+    </div>`;
+}
+function setThemeMode(mode){currentTheme.mode=mode;applyTheme(currentTheme);router();}
+function setThemeColor(color){currentTheme.primary=color;applyTheme(currentTheme);router();}
+function setThemeSidebar(style){currentTheme.sidebar=style;applyTheme(currentTheme);router();}
+async function changePassword(){
+  const old_password=document.getElementById('set-oldpwd').value;
+  const new_password=document.getElementById('set-newpwd').value;
+  if(!old_password||!new_password){toast('请填写完整',false);return;}
+  try{
+    const r=await api('/api/auth/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({old_password,new_password})});
+    if(r.error){toast(r.error,false);return;}
+    toast('密码已修改',true);
+  }catch(e){}
+}
+async function saveSMTP(){
+  CFG.smtp={
+    host:document.getElementById('set-smtp-host').value,
+    port:parseInt(document.getElementById('set-smtp-port').value)||465,
+    username:document.getElementById('set-smtp-user').value,
+    password:document.getElementById('set-smtp-pass').value,
+    from:document.getElementById('set-smtp-from').value,
+    ssl:document.getElementById('set-smtp-ssl').checked
+  };
+  await saveConfig();
+  toast('SMTP 配置已保存',true);
+}
+async function testSMTP(){
+  await saveSMTP();
+  const email=prompt('输入测试收件邮箱:');
+  if(!email)return;
+  toast('正在发送测试邮件...',true);
+  const r=await api('/api/test-notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:-1,type:'email',to:email})});
+  if(r.error)toast('发送失败: '+r.error,false);else toast('测试邮件已发送',true);
+}
+// === Docs ===
+function renderDocs(el){
+  const hash=location.hash;
+  const section=hash.includes('/docs/')? hash.split('/docs/')[1]:'overview';
+  const tocGroups=[
+    {title:'平台',items:[
+      {id:'overview',title:'平台概述'},
+      {id:'deploy',title:'部署指南'},
+      {id:'auth-doc',title:'账号与权限'},
+      {id:'api',title:'API 参考'},
+      {id:'env',title:'环境变量'},
+    ]},
+    {title:'日志分析',items:[
+      {id:'log-overview',title:'功能概述'},
+      {id:'sources-doc',title:'日志源配置'},
+      {id:'filebeat-doc',title:'Filebeat 接入'},
+      {id:'notifications-doc',title:'通知渠道'},
+      {id:'feishu-doc',title:'飞书机器人'},
+      {id:'llm-doc',title:'LLM 配置'},
+      {id:'schedule-doc',title:'定时任务'},
+      {id:'issues-doc',title:'问题管理'},
+    ]},
+    {title:'其他',items:[
+      {id:'faq',title:'常见问题'},
+    ]},
+  ];
+  el.innerHTML=`
+    <div style="display:flex;gap:24px">
+      <div style="width:180px;flex-shrink:0;position:sticky;top:20px;align-self:flex-start">
+        ${tocGroups.map(g=>`<div style="margin-bottom:16px"><div style="font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);padding:4px 10px;margin-bottom:4px">${g.title}</div>${g.items.map(t=>`<a href="#/docs/${t.id}" style="display:block;padding:6px 10px;border-radius:6px;text-decoration:none;font-size:.84rem;color:${section===t.id?'var(--primary)':'var(--text-secondary)'};background:${section===t.id?'var(--sidebar-active-bg)':'transparent'};margin-bottom:2px">${t.title}</a>`).join('')}</div>`).join('')}
+      </div>
+      <div style="flex:1;min-width:0" id="doc-content"></div>
+    </div>`;
+  renderDocSection(section);
+}
+function renderDocSection(id){
+  const el=document.getElementById('doc-content');
+  if(!el)return;
+  const docs={
+overview:`<h2>平台概述</h2>
+<div class="card">
+<p><b>OpsPanel</b> 是一个可扩展的运维工具平台，为团队提供统一的运维管理入口。</p>
+<h3 style="margin-top:16px">设计理念</h3>
+<ul>
+<li><b>模块化</b> — 功能按模块组织，各模块独立运作，按需启用</li>
+<li><b>零依赖前端</b> — 纯 HTML/CSS/JS，无构建步骤，嵌入二进制直接运行</li>
+<li><b>多数据库</b> — 默认 SQLite 零配置，可切换 MySQL/PostgreSQL</li>
+<li><b>容器化</b> — 单个 Docker 镜像，Alpine 基础，体积小启动快</li>
+<li><b>可定制</b> — 内置主题系统，支持亮暗模式和主色调切换</li>
+</ul>
+<h3 style="margin-top:16px">当前模块</h3>
+<table class="history-table">
+<thead><tr><th>模块</th><th>功能</th><th>状态</th></tr></thead>
+<tbody>
+<tr><td><b>日志分析</b></td><td>定时采集日志 → LLM 智能分析 → 多渠道告警推送</td><td><span class="tag tag-ok">可用</span></td></tr>
+</tbody>
+</table>
+<h3 style="margin-top:16px">技术栈</h3>
+<ul>
+<li>后端: Go + Gin 框架 + GORM</li>
+<li>认证: JWT + bcrypt</li>
+<li>前端: 原生 HTML/CSS/JS SPA</li>
+<li>部署: Docker，Alpine 3.19</li>
+</ul>
+</div>`,
+deploy:`<h2>部署指南</h2>
+<div class="card">
+<h3>前置条件</h3>
+<ul><li>Docker 和 docker compose 已安装</li><li>目标机器可访问需要监控的日志目录</li></ul>
+<h3 style="margin-top:16px">快速部署</h3>
+<pre style="background:var(--bg);padding:12px;border-radius:6px;font-size:.8rem;overflow-x:auto;color:var(--text-secondary)">
+# 1. 拷贝项目到目标机器
+scp -r opspanel/ root@your-server:/opt/
+
+# 2. 配置环境变量
+cd /opt/opspanel && cp .env.example .env
+# 编辑 .env：设置 LOG_DIR、JWT_SECRET
+
+# 3. 启动（默认账号: admin / admin123）
+docker compose up -d
+</pre>
+<h3 style="margin-top:16px">多日志目录</h3>
+<pre style="background:var(--bg);padding:12px;border-radius:6px;font-size:.8rem;color:var(--text-secondary)">
+volumes:
+  - ./data:/data
+  - /var/log:/mnt/syslog:ro
+  - /opt/app/logs:/mnt/app:ro
+</pre>
+<h3 style="margin-top:16px">数据库选择</h3>
+<pre style="background:var(--bg);padding:12px;border-radius:6px;font-size:.8rem;color:var(--text-secondary)">
+# SQLite（默认）  DB_DRIVER=sqlite  DB_DSN=/data/sentinel.db
+# MySQL          DB_DRIVER=mysql   DB_DSN=user:pass@tcp(host:3306)/opspanel?charset=utf8mb4&parseTime=True
+# PostgreSQL     DB_DRIVER=postgres DB_DSN=host=... user=... dbname=opspanel sslmode=disable
+</pre>
+</div>`,
+'auth-doc':`<h2>账号与权限</h2>
+<div class="card">
+<h3>角色体系</h3>
+<table class="history-table">
+<thead><tr><th>角色</th><th>说明</th><th>权限</th></tr></thead>
+<tbody>
+<tr><td><b>admin</b></td><td>管理员</td><td>所有操作：查看、配置、触发、用户管理</td></tr>
+<tr><td><b>viewer</b></td><td>观察者</td><td>只读：查看仪表盘、历史、问题、配置（脱敏）</td></tr>
+</tbody>
+</table>
+<h3 style="margin-top:16px">认证</h3>
+<p>JWT 认证，有效期 24 小时。密钥通过 <code>JWT_SECRET</code> 环境变量配置。</p>
+<h3 style="margin-top:16px">默认账号</h3>
+<p>首次启动自动创建：<code>admin</code> / <code>admin123</code>。建议首次登录后修改密码。</p>
+</div>`,
+api:`<h2>API 参考</h2>
+<div class="card">
+<h3>认证</h3>
+<table class="history-table">
+<thead><tr><th>方法</th><th>路径</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>POST</td><td><code>/api/auth/login</code></td><td>登录 → {token, username, role}</td></tr>
+<tr><td>GET</td><td><code>/api/auth/me</code></td><td>当前用户</td></tr>
+<tr><td>POST</td><td><code>/api/auth/password</code></td><td>修改密码</td></tr>
+</tbody>
+</table>
+<h3 style="margin-top:16px">用户管理（admin）</h3>
+<table class="history-table">
+<thead><tr><th>方法</th><th>路径</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>GET</td><td><code>/api/users</code></td><td>列表</td></tr>
+<tr><td>POST</td><td><code>/api/users</code></td><td>创建</td></tr>
+<tr><td>PUT</td><td><code>/api/users/:id</code></td><td>更新</td></tr>
+<tr><td>DELETE</td><td><code>/api/users/:id</code></td><td>删除</td></tr>
+</tbody>
+</table>
+<h3 style="margin-top:16px">日志分析</h3>
+<table class="history-table">
+<thead><tr><th>方法</th><th>路径</th><th>权限</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>GET</td><td><code>/api/config</code></td><td>viewer</td><td>获取配置</td></tr>
+<tr><td>POST</td><td><code>/api/config</code></td><td>admin</td><td>保存配置</td></tr>
+<tr><td>GET</td><td><code>/api/status</code></td><td>viewer</td><td>状态</td></tr>
+<tr><td>POST</td><td><code>/api/trigger</code></td><td>admin</td><td>触发分析</td></tr>
+<tr><td>GET</td><td><code>/api/history</code></td><td>viewer</td><td>历史</td></tr>
+<tr><td>GET/POST</td><td><code>/api/issues</code></td><td>viewer/admin</td><td>问题列表/更新状态</td></tr>
+<tr><td>POST</td><td><code>/api/test-*</code></td><td>admin</td><td>测试通知/采集/LLM</td></tr>
+</tbody>
+</table>
+<p style="margin-top:12px;font-size:.82rem;color:var(--text-muted)">除 /api/auth/login 和 /healthz 外，所有接口需要 Bearer token。</p>
+</div>`,
+env:`<h2>环境变量</h2>
+<div class="card">
+<h3>基础</h3>
+<table class="history-table">
+<thead><tr><th>变量</th><th>默认</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>LOG_DIR</code></td><td>必填</td><td>宿主机日志目录</td></tr>
+<tr><td><code>LISTEN_PORT</code></td><td>9090</td><td>监听端口</td></tr>
+<tr><td><code>DB_DRIVER</code></td><td>sqlite</td><td>sqlite/mysql/postgres</td></tr>
+<tr><td><code>DB_DSN</code></td><td>/data/sentinel.db</td><td>连接串</td></tr>
+<tr><td><code>JWT_SECRET</code></td><td>内置</td><td>JWT 签名密钥</td></tr>
+</tbody>
+</table>
+<h3 style="margin-top:16px">日志分析</h3>
+<table class="history-table">
+<thead><tr><th>变量</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>LOG_SENTINEL_LLM_URL</code></td><td>LLM API 地址</td></tr>
+<tr><td><code>LOG_SENTINEL_LLM_KEY</code></td><td>API Key</td></tr>
+<tr><td><code>LOG_SENTINEL_LLM_MODEL</code></td><td>模型名称</td></tr>
+<tr><td><code>LOG_SENTINEL_SCHEDULE_ENABLED</code></td><td>启用定时</td></tr>
+<tr><td><code>LOG_SENTINEL_SCHEDULE_CRON</code></td><td>Cron 表达式</td></tr>
+<tr><td><code>LOG_SENTINEL_NOTIFY_WEBHOOK</code></td><td>快速通知 URL</td></tr>
+</tbody>
+</table>
+</div>`,
+'log-overview':`<h2>日志分析模块</h2>
+<div class="card">
+<p>OpsPanel 的核心模块，提供自动化日志监控和告警。</p>
+<h3 style="margin-top:16px">工作流程</h3>
+<pre style="background:var(--bg);padding:12px;border-radius:6px;font-size:.8rem;overflow-x:auto;color:var(--text-secondary)">
+Cron 调度 ──▶ 日志采集(增量) ──▶ LLM 分析(结构化) ──▶ 通知分发(多渠道)
+                  │                      │
+                  ▼                      ▼
+            scan_state              issues(问题列表)
+</pre>
+<h3 style="margin-top:16px">核心特性</h3>
+<ul>
+<li><b>增量扫描</b> — 记录偏移量，不重复分析</li>
+<li><b>多格式</b> — 纯文本、JSON、多行堆栈</li>
+<li><b>多渠道</b> — 飞书、企微、钉钉、Webhook</li>
+<li><b>LLM 分析</b> — 兼容 OpenAI 格式，输出结构化问题</li>
+<li><b>问题追踪</b> — P0-P3 优先级，含原因和影响</li>
+</ul>
+</div>`,
+'sources-doc':`<h2>日志源配置</h2>
+<div class="card">
+<p>日志源定义了 OpsPanel 从哪里获取日志数据。支持两种类型：</p>
+<h3 style="margin-top:16px">本地文件（local）</h3>
+<p>OpsPanel 直接读取容器内挂载的日志文件，适合日志文件与 OpsPanel 在同一台机器上的场景。</p>
+<table class="history-table" style="margin-top:12px">
+<thead><tr><th>字段</th><th>说明</th><th>示例</th></tr></thead>
+<tbody>
+<tr><td>名称</td><td>显示用标识</td><td>游戏服日志</td></tr>
+<tr><td>类型</td><td>选择"本地文件"</td><td>local</td></tr>
+<tr><td>路径</td><td>容器内日志目录（通过 docker volume 挂载）</td><td>/mnt/game7</td></tr>
+<tr><td>文件匹配</td><td>glob 模式，匹配哪些文件</td><td>*.log</td></tr>
+<tr><td>日志格式</td><td>纯文本 / JSON / 多行</td><td>plain</td></tr>
+<tr><td>过滤正则</td><td>只保留匹配的行</td><td>ERROR|CRASH|panic</td></tr>
+</tbody>
+</table>
+<h3 style="margin-top:16px">Filebeat（推荐）</h3>
+<p>通过 Filebeat 从远程或本地服务器推送日志到 OpsPanel，适合多服务器、分布式场景。详见 <a href="#/docs/filebeat-doc" style="color:var(--primary)">Filebeat 接入</a>。</p>
+<table class="history-table" style="margin-top:12px">
+<thead><tr><th>字段</th><th>说明</th><th>示例</th></tr></thead>
+<tbody>
+<tr><td>名称</td><td>显示用标识</td><td>Filebeat</td></tr>
+<tr><td>类型</td><td>选择"Filebeat"</td><td>filebeat</td></tr>
+<tr><td>服务器标识字段</td><td>从 Filebeat 文档中提取服务器标识的字段路径</td><td>fields.server_id</td></tr>
+<tr><td>过滤正则</td><td>只存储匹配的日志行</td><td>ERROR|CRASH|exception|panic|fatal</td></tr>
+</tbody>
+</table>
+<h3 style="margin-top:16px">格式说明</h3>
+<ul>
+<li><b>纯文本（plain）</b> — 按行读取，正则过滤匹配行</li>
+<li><b>JSON</b> — 解析 JSON 格式日志，按指定字段提取消息和级别</li>
+<li><b>多行（multiline）</b> — 按起始正则合并连续行，适合堆栈跟踪</li>
+</ul>
+<h3 style="margin-top:16px">注意事项</h3>
+<ul>
+<li>本地文件类型和 Filebeat 类型不要监控同一批文件，否则会重复采集</li>
+<li>过滤正则修改后立即生效，无需重启</li>
+<li>Filebeat 类型的"测试"按钮会显示最近收到的日志条目</li>
+</ul>
+</div>`,
+'notifications-doc':`<h2>通知渠道</h2>
+<div class="card">
+<p>通知渠道是全局配置，所有模块（日志推送、定时任务等）共享。支持以下类型：</p>
+<table class="history-table" style="margin-top:12px">
+<thead><tr><th>类型</th><th>说明</th><th>Webhook 格式</th></tr></thead>
+<tbody>
+<tr><td><b>飞书</b></td><td>飞书群自定义机器人</td><td>https://open.feishu.cn/open-apis/bot/v2/hook/xxx</td></tr>
+<tr><td><b>企业微信</b></td><td>企微群机器人</td><td>https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx</td></tr>
+<tr><td><b>钉钉</b></td><td>钉钉群自定义机器人</td><td>https://oapi.dingtalk.com/robot/send?access_token=xxx</td></tr>
+<tr><td><b>邮件</b></td><td>通过 SMTP 发送邮件</td><td>填写收件邮箱地址</td></tr>
+<tr><td><b>通用 Webhook</b></td><td>任意 HTTP 接口</td><td>POST JSON: {title, body, timestamp}</td></tr>
+</tbody>
+</table>
+<h3 style="margin-top:16px">添加步骤</h3>
+<ol>
+<li>进入「系统 → 通知渠道」页面</li>
+<li>点击「+ 添加渠道」</li>
+<li>选择类型，填写名称和 Webhook URL</li>
+<li>如果机器人开启了签名校验，填写签名密钥</li>
+<li>保存后点击「测试」验证是否收到消息</li>
+</ol>
+<h3 style="margin-top:16px">签名校验</h3>
+<p>飞书和钉钉支持签名校验（HMAC-SHA256），开启后需要在 OpsPanel 中填写对应的密钥。不开启签名也能正常使用，但安全性较低。</p>
+<h3 style="margin-top:16px">邮件通知</h3>
+<p>使用邮件通知前，需要先在「设置 → SMTP」中配置发件邮箱信息（SMTP 服务器、端口、用户名、密码）。</p>
+<p style="margin-top:8px">详细的飞书机器人创建步骤请参考 <a href="#/docs/feishu-doc" style="color:var(--primary)">飞书机器人</a> 文档。</p>
+</div>`,
+'feishu-doc':`<h2>飞书机器人配置</h2>
+<div class="card">
+<p>飞书自定义机器人（Webhook）是最常用的告警通知方式，配置简单，消息即时送达。</p>
+<h3 style="margin-top:16px">第一步：创建飞书群</h3>
+<ol>
+<li>打开飞书客户端（桌面版或手机版）</li>
+<li>点击左上角「+」→「创建群组」</li>
+<li>填写群名称（如"运维告警"），添加需要接收通知的成员</li>
+<li>点击「创建」</li>
+</ol>
+<p style="margin-top:8px;font-size:.82rem;color:var(--text-muted)">如果已有群聊，可以跳过此步骤，直接在已有群中添加机器人。</p>
+<h3 style="margin-top:16px">第二步：添加自定义机器人</h3>
+<ol>
+<li>进入目标群聊</li>
+<li>点击群聊右上角的「⋯」或「设置」图标</li>
+<li>找到「群机器人」选项，点击进入</li>
+<li>点击「添加机器人」</li>
+<li>在机器人列表中选择「自定义机器人」</li>
+<li>填写机器人名称（如"OpsPanel 告警"）</li>
+<li>可选：上传一个头像图片</li>
+<li>点击「添加」完成创建</li>
+</ol>
+<h3 style="margin-top:16px">第三步：获取 Webhook 地址</h3>
+<ol>
+<li>机器人创建成功后，会显示 Webhook 地址</li>
+<li>地址格式为：<code>https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</code></li>
+<li>点击「复制」按钮复制该地址</li>
+</ol>
+<div style="background:var(--bg);padding:12px;border-radius:6px;margin-top:12px;border-left:3px solid var(--warning)">
+<p style="font-size:.82rem;color:var(--text-secondary)"><b>⚠️ 注意：</b>Webhook 地址相当于机器人的密码，不要泄露给无关人员。任何人拿到这个地址都可以向群里发消息。</p>
+</div>
+<h3 style="margin-top:16px">第四步：安全设置（可选）</h3>
+<p>在机器人设置页面，可以开启「签名校验」：</p>
+<ol>
+<li>开启后会生成一个签名密钥（Secret）</li>
+<li>复制该密钥</li>
+<li>在 OpsPanel 添加通知渠道时，将密钥填入「签名密钥」字段</li>
+</ol>
+<p style="margin-top:8px;font-size:.82rem;color:var(--text-muted)">不开启签名校验也能正常使用。开启后 OpsPanel 会在每次发送时计算 HMAC-SHA256 签名，飞书服务端会验证签名有效性。</p>
+<h3 style="margin-top:16px">第五步：在 OpsPanel 中配置</h3>
+<ol>
+<li>进入 OpsPanel →「系统 → 通知渠道」</li>
+<li>点击「+ 添加渠道」</li>
+<li>类型选择「飞书」</li>
+<li>名称填写一个便于识别的名字（如"运维告警群"）</li>
+<li>Webhook URL 粘贴第三步复制的地址</li>
+<li>签名密钥：如果开启了签名校验则填写，否则留空</li>
+<li>确认「启用」开关打开</li>
+<li>点击「保存」</li>
+</ol>
+<h3 style="margin-top:16px">第六步：测试</h3>
+<p>保存后，在通知渠道列表中点击该渠道的「测试」按钮。如果配置正确，飞书群内会收到一条测试消息。</p>
+<h3 style="margin-top:16px">常见问题</h3>
+<ul>
+<li><b>测试失败，提示 "sign match fail"</b> — 签名密钥填写错误，检查是否多了空格或换行</li>
+<li><b>测试失败，提示 "token is not exist"</b> — Webhook URL 不正确或机器人已被删除</li>
+<li><b>收不到消息</b> — 检查机器人是否还在群中，以及群是否被解散</li>
+<li><b>消息频率限制</b> — 飞书限制每个机器人每分钟最多 100 条消息，超出会被限流</li>
+</ul>
+</div>`,
+'filebeat-doc':`<h2>Filebeat 接入</h2>
+<div class="card">
+<p>Filebeat 是 Elastic 官方的轻量级日志采集器。OpsPanel 模拟了 Elasticsearch 的接收接口，Filebeat 可以直接将日志推送到 OpsPanel，无需部署真正的 Elasticsearch。</p>
+<h3 style="margin-top:16px">架构说明</h3>
+<pre style="background:var(--bg);padding:12px;border-radius:6px;font-size:.8rem;overflow-x:auto;color:var(--text-secondary)">
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  服务器 A    │     │  服务器 B    │     │  服务器 C    │
+│  Filebeat   │     │  Filebeat   │     │  Filebeat   │
+└──────┬──────┘     └──────┬──────┘     └──────┬──────┘
+       │                   │                   │
+       └───────────────────┼───────────────────┘
+                           │ HTTP (_bulk API)
+                           ▼
+                    ┌──────────────┐
+                    │   OpsPanel   │
+                    │  :9091       │
+                    └──────────────┘
+</pre>
+<h3 style="margin-top:16px">第一步：安装 Filebeat</h3>
+<p><b>方式一：Docker（推荐）</b></p>
+<pre style="background:var(--bg);padding:12px;border-radius:6px;font-size:.8rem;overflow-x:auto;color:var(--text-secondary)">
+docker pull docker.elastic.co/beats/filebeat:7.17.0
+</pre>
+<p style="margin-top:12px"><b>方式二：APT（Ubuntu/Debian）</b></p>
+<pre style="background:var(--bg);padding:12px;border-radius:6px;font-size:.8rem;overflow-x:auto;color:var(--text-secondary)">
+curl -fsSL https://artifacts.elastic.co/GPG-KEY-elasticsearch | gpg --dearmor -o /usr/share/keyrings/elastic.gpg
+echo "deb [signed-by=/usr/share/keyrings/elastic.gpg] https://artifacts.elastic.co/packages/7.x/apt stable main" > /etc/apt/sources.list.d/elastic-7.x.list
+apt-get update && apt-get install -y filebeat
+</pre>
+<h3 style="margin-top:16px">第二步：编写配置文件</h3>
+<p>创建 <code>filebeat.yml</code>，为每个服务器节点配置一个 input，通过 <code>fields.server_id</code> 区分来源：</p>
+<pre style="background:var(--bg);padding:12px;border-radius:6px;font-size:.8rem;overflow-x:auto;color:var(--text-secondary)">
+filebeat.inputs:
+  # 节点 1
+  - type: log
+    enabled: true
+    paths:
+      - /opt/game7/shared/node1/sys_log/error.log
+    fields:
+      server_id: "node1"
+    fields_under_root: false
+
+  # 节点 2
+  - type: log
+    enabled: true
+    paths:
+      - /opt/game7/shared/node2/sys_log/error.log
+    fields:
+      server_id: "node2"
+    fields_under_root: false
+
+  # 节点 3
+  - type: log
+    enabled: true
+    paths:
+      - /opt/game7/shared/node3/sys_log/error.log
+    fields:
+      server_id: "node3"
+    fields_under_root: false
+
+  # 中央服
+  - type: log
+    enabled: true
+    paths:
+      - /opt/game7/shared/center/sys_log/error.log
+    fields:
+      server_id: "center"
+    fields_under_root: false
+
+# 输出到 OpsPanel
+output.elasticsearch:
+  hosts: ["http://192.168.0.101:9091"]
+
+logging.level: info
+logging.to_files: false
+</pre>
+<h3 style="margin-top:16px">第三步：启动 Filebeat</h3>
+<p><b>Docker 方式：</b></p>
+<pre style="background:var(--bg);padding:12px;border-radius:6px;font-size:.8rem;overflow-x:auto;color:var(--text-secondary)">
+docker run -d \\
+  --name filebeat \\
+  --restart unless-stopped \\
+  --network opspanel_default \\
+  -v /path/to/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro \\
+  -v /opt/game7/shared:/opt/game7/shared:ro \\
+  -v /opt/filebeat/data:/usr/share/filebeat/data \\
+  --user root \\
+  docker.elastic.co/beats/filebeat:7.17.0
+</pre>
+<p style="margin-top:8px;font-size:.82rem;color:var(--text-muted)">注意：如果 Filebeat 和 OpsPanel 在同一台机器上且使用 Docker 网络，output.hosts 可以用容器名（如 <code>http://opspanel:9090</code>）。</p>
+<p style="margin-top:12px"><b>系统服务方式：</b></p>
+<pre style="background:var(--bg);padding:12px;border-radius:6px;font-size:.8rem;overflow-x:auto;color:var(--text-secondary)">
+# 将配置文件放到 /etc/filebeat/filebeat.yml
+systemctl enable filebeat
+systemctl start filebeat
+</pre>
+<h3 style="margin-top:16px">第四步：在 OpsPanel 中配置日志源</h3>
+<ol>
+<li>进入「日志分析 → 日志源」</li>
+<li>点击「+ 添加日志源」</li>
+<li>类型选择「Filebeat」</li>
+<li>名称填写（如"游戏服 Filebeat"）</li>
+<li>服务器标识字段填写 <code>fields.server_id</code></li>
+<li>过滤正则填写需要关注的关键词（如 <code>ERROR|CRASH|exception|panic|fatal</code>）</li>
+<li>保存</li>
+</ol>
+<h3 style="margin-top:16px">第五步：验证</h3>
+<ol>
+<li>查看 Filebeat 日志确认连接成功：<code>docker logs filebeat</code></li>
+<li>应看到 <code>Connection to backoff(elasticsearch(...)) established</code></li>
+<li>在 OpsPanel「采集日志」页面查看是否有数据进入</li>
+<li>使用「服务器」下拉筛选确认各节点标识正确</li>
+</ol>
+<h3 style="margin-top:16px">配置说明</h3>
+<table class="history-table">
+<thead><tr><th>配置项</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>fields.server_id</code></td><td>自定义服务器标识，会显示在采集日志的"服务器"列</td></tr>
+<tr><td><code>fields_under_root: false</code></td><td>将自定义字段放在 fields 子对象下（推荐）</td></tr>
+<tr><td><code>output.elasticsearch.hosts</code></td><td>OpsPanel 的地址，支持 http 和 https</td></tr>
+<tr><td><code>paths</code></td><td>要监控的日志文件路径，支持 glob（如 /var/log/*.log）</td></tr>
+</tbody>
+</table>
+<h3 style="margin-top:16px">常见问题</h3>
+<ul>
+<li><b>连接失败 404</b> — 确认 OpsPanel 版本支持 Filebeat 接入（需要 _xpack 等模拟接口）</li>
+<li><b>权限错误</b> — Docker 方式需要 <code>--user root</code>，或确保 data 目录可写</li>
+<li><b>日志不更新</b> — Filebeat 只读取新增内容，历史日志需要删除 registry 重新采集：<code>rm -rf /opt/filebeat/data/registry</code></li>
+<li><b>重复采集</b> — 确保本地文件类型的日志源不要监控 Filebeat 已覆盖的路径</li>
+<li><b>服务器标识为空</b> — 检查 filebeat.yml 中 fields.server_id 是否配置正确，OpsPanel 日志源的"服务器标识字段"是否填写为 <code>fields.server_id</code></li>
+</ul>
+</div>`,
+'llm-doc':`<h2>LLM 配置</h2>
+<div class="card">
+<p>兼容 OpenAI chat/completions 格式。</p>
+<table class="history-table">
+<thead><tr><th>服务</th><th>API 地址</th><th>模型</th></tr></thead>
+<tbody>
+<tr><td>DeepSeek</td><td>api.deepseek.com/v1/chat/completions</td><td>deepseek-chat</td></tr>
+<tr><td>通义千问</td><td>dashscope.aliyuncs.com/compatible-mode/v1/chat/completions</td><td>qwen-plus</td></tr>
+<tr><td>OpenAI</td><td>api.openai.com/v1/chat/completions</td><td>gpt-4o-mini</td></tr>
+</tbody>
+</table>
+<p style="margin-top:12px">不配置 LLM 时仍可运行，直接推送原始日志摘要。</p>
+</div>`,
+'schedule-doc':`<h2>定时任务</h2>
+<div class="card">
+<p>标准 5 字段 Cron：<code>分 时 日 月 周</code></p>
+<table class="history-table">
+<thead><tr><th>表达式</th><th>含义</th></tr></thead>
+<tbody>
+<tr><td><code>0 9 * * *</code></td><td>每天 9:00</td></tr>
+<tr><td><code>*/30 * * * *</code></td><td>每 30 分钟</td></tr>
+<tr><td><code>0 9 * * 1-5</code></td><td>工作日 9:00</td></tr>
+</tbody>
+</table>
+<p style="margin-top:12px"><b>日志上限</b>：发送给 LLM 的最大字节数，建议 8000-16000。</p>
+</div>`,
+'issues-doc':`<h2>问题管理</h2>
+<div class="card">
+<table class="history-table">
+<thead><tr><th>级别</th><th>含义</th><th>场景</th></tr></thead>
+<tbody>
+<tr><td><span class="tag" style="background:#dc2626">P0</span></td><td>致命</td><td>宕机、数据丢失</td></tr>
+<tr><td><span class="tag" style="background:#ea580c">P1</span></td><td>严重</td><td>功能异常、频繁超时</td></tr>
+<tr><td><span class="tag" style="background:#ca8a04">P2</span></td><td>警告</td><td>偶发错误</td></tr>
+<tr><td><span class="tag" style="background:#6b7280">P3</span></td><td>提示</td><td>潜在风险</td></tr>
+</tbody>
+</table>
+<p style="margin-top:12px"><b>生命周期：</b>触发分析 → LLM 输出 → 入库(open) → 人工确认 → 标记已解决(resolved)</p>
+</div>`,
+faq:`<h2>常见问题</h2>
+<div class="card">
+<h3>平台</h3>
+<p><b>Q: 忘记密码？</b> 删除 data/sentinel.db 重启，会重建默认 admin。</p>
+<p style="margin-top:8px"><b>Q: 如何备份？</b> 备份 data/ 目录即可。</p>
+<p style="margin-top:8px"><b>Q: 修改端口？</b> .env 中改 LISTEN_PORT，重启容器。</p>
+<h3 style="margin-top:20px">日志分析</h3>
+<p><b>Q: 会重复扫描吗？</b> 不会，记录偏移量只读新增内容。</p>
+<p style="margin-top:8px"><b>Q: LLM 失败？</b> 回退到推送原始摘要，用测试按钮验证配置。</p>
+<p style="margin-top:8px"><b>Q: 多目录？</b> docker-compose 挂载多个，Web UI 添加多个日志源。</p>
+<p style="margin-top:8px"><b>Q: 资源占用？</b> 限制 256MB/0.5CPU，实际约 10-20MB。</p>
+</div>`
+  };
+  el.innerHTML=docs[id]||'<div class="empty">文档加载中...</div>';
+}
+
+// === Init ===
+async function init(){
+  loadAuth();
+  if(!isLoggedIn()){router();return;}
+  updateSidebar();
+  try{
+    await Promise.all([loadConfig(),loadStatus(),loadHistory(),loadIssues(),loadJobs()]);
+    if(isAdmin()){try{await loadUsers();}catch(e){}}
+  }catch(e){return;}
+  router();
+}
+init();
+</script>
+</body>
+</html>
