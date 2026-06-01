@@ -337,7 +337,7 @@ func classifyLevel(line string) string {
 			}
 		}
 	}
-	return "info"
+	return "undefined"
 }
 
 // matchFilter 检查行是否匹配过滤正则
