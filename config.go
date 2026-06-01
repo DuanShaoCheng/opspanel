@@ -15,7 +15,6 @@ type Config struct {
 	LogSources    []LogSource       `json:"log_sources"`
 	Notifications []Notification    `json:"notifications"`
 	LLMProviders  []LLMProvider     `json:"llm_providers"`
-	LLM           LLMConfig         `json:"llm"`
 	Schedule      ScheduleConfig    `json:"schedule"`
 	SMTP          SMTPConfig        `json:"smtp"`
 	LogAnalysis   LogAnalysisConfig `json:"log_analysis"`
@@ -53,13 +52,6 @@ type Notification struct {
 	Webhook string `json:"webhook"`
 	Secret  string `json:"secret"`
 	Enabled bool   `json:"enabled"`
-}
-
-type LLMConfig struct {
-	APIURL       string `json:"api_url"`
-	APIKey       string `json:"api_key"`
-	Model        string `json:"model"`
-	SystemPrompt string `json:"system_prompt"`
 }
 
 type ScheduleConfig struct {
@@ -122,9 +114,7 @@ func DefaultConfig() *Config {
 			},
 		},
 		Notifications: []Notification{},
-		LLM: LLMConfig{
-			SystemPrompt: "你是一个服务器运维专家。请分析以下错误日志，输出结构化摘要：\n1. 关键错误（按严重程度排序）\n2. 重复出现的错误模式\n3. 影响范围\n4. 处理建议\n\n如果没有严重问题，简短说明即可。输出使用中文，不超过 500 字。",
-		},
+		LLMProviders:  []LLMProvider{},
 		Schedule: ScheduleConfig{
 			Enabled:  false,
 			CronExpr: "0 9 * * *",
@@ -155,18 +145,6 @@ func LoadConfig() *Config {
 
 // LoadEnvOverrides 用环境变量覆盖配置，优先级高于 config.json
 func LoadEnvOverrides(c *Config) {
-	if v := os.Getenv("LOG_SENTINEL_LLM_URL"); v != "" {
-		c.LLM.APIURL = v
-	}
-	if v := os.Getenv("LOG_SENTINEL_LLM_KEY"); v != "" {
-		c.LLM.APIKey = v
-	}
-	if v := os.Getenv("LOG_SENTINEL_LLM_MODEL"); v != "" {
-		c.LLM.Model = v
-	}
-	if v := os.Getenv("LOG_SENTINEL_LLM_PROMPT"); v != "" {
-		c.LLM.SystemPrompt = v
-	}
 	if v := os.Getenv("LOG_SENTINEL_SCHEDULE_CRON"); v != "" {
 		c.Schedule.CronExpr = v
 	}
@@ -301,14 +279,11 @@ type SMTPConfig struct {
 func GetLLMProvider(id string) *LLMProvider {
 	cfgMu.RLock()
 	defer cfgMu.RUnlock()
-	for i := range cfg.LLMProviders {
-		if cfg.LLMProviders[i].ID == id {
-			return &cfg.LLMProviders[i]
-		}
-	}
-	if cfg.LLM.APIURL != "" {
-		return &LLMProvider{
-			ID: "legacy", APIURL: cfg.LLM.APIURL, APIKey: cfg.LLM.APIKey, Model: cfg.LLM.Model,
+	if id != "" {
+		for i := range cfg.LLMProviders {
+			if cfg.LLMProviders[i].ID == id {
+				return &cfg.LLMProviders[i]
+			}
 		}
 	}
 	if len(cfg.LLMProviders) > 0 {

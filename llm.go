@@ -29,12 +29,11 @@ const structuredPrompt = `你是一个服务器运维专家。请分析以下错
 [{"priority":"P1","title":"数据库连接超时","cause":"MySQL 连接池耗尽，过去1小时出现12次","impact":"部分用户请求会返回500错误","raw_log":"[ERROR] 2024-01-01 10:00:00 db connection timeout after 30s"}]`
 
 // CallLLM 调用 LLM 获取结构化分析结果
-func CallLLM(cfg LLMConfig, logs string, hours int) (string, error) {
-	if cfg.APIURL == "" || cfg.APIKey == "" {
+func CallLLM(provider *LLMProvider, systemPrompt string, logs string, hours int) (string, error) {
+	if provider == nil || provider.APIURL == "" || provider.APIKey == "" {
 		return "", fmt.Errorf("LLM not configured")
 	}
 
-	systemPrompt := cfg.SystemPrompt
 	if systemPrompt == "" {
 		systemPrompt = structuredPrompt
 	}
@@ -42,7 +41,7 @@ func CallLLM(cfg LLMConfig, logs string, hours int) (string, error) {
 	userMsg := fmt.Sprintf("以下是过去 %d 小时的错误日志：\n\n%s", hours, logs)
 
 	payload := map[string]interface{}{
-		"model": cfg.Model,
+		"model": provider.Model,
 		"messages": []map[string]string{
 			{"role": "system", "content": systemPrompt},
 			{"role": "user", "content": userMsg},
@@ -52,9 +51,9 @@ func CallLLM(cfg LLMConfig, logs string, hours int) (string, error) {
 	}
 
 	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", cfg.APIURL, bytes.NewReader(body))
+	req, _ := http.NewRequest("POST", provider.APIURL, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+	req.Header.Set("Authorization", "Bearer "+provider.APIKey)
 
 	client := &http.Client{Timeout: 90 * time.Second}
 	resp, err := client.Do(req)

@@ -266,37 +266,43 @@ func logAnalysisHandler(config string) error {
     return nil
   }
 
-  var batches []string
-  var buf strings.Builder
-  for _, e := range entries {
-    line := fmt.Sprintf("[%s][%s][%s] %s\n",
-      e.CreatedAt.Format("15:04:05"), e.Level, e.Source, e.Content)
-    if buf.Len()+len(line) > params.BatchLen && buf.Len() > 0 {
-      batches = append(batches, buf.String())
-      buf.Reset()
-    }
-    buf.WriteString(line)
+  // 按 source+level 分组，生成简略摘要
+  type group struct {
+    Source  string
+    Level   string
+    Count   int
+    Latest  string
   }
-  if buf.Len() > 0 {
-    batches = append(batches, buf.String())
+  groupKey := func(e LogEntry) string { return e.Source + "|" + e.Level }
+  groups := make(map[string]*group)
+  var order []string
+  for _, e := range entries {
+    k := groupKey(e)
+    if g, ok := groups[k]; ok {
+      g.Count++
+      g.Latest = e.Content
+    } else {
+      groups[k] = &group{Source: e.Source, Level: e.Level, Count: 1, Latest: e.Content}
+      order = append(order, k)
+    }
   }
 
+  var buf strings.Builder
+  buf.WriteString(fmt.Sprintf(params.MsgHeader+"\n\n", params.Hours, len(entries)))
+  for _, k := range order {
+    g := groups[k]
+    latest := g.Latest
+    if len(latest) > 80 {
+      latest = latest[:80] + "..."
+    }
+    buf.WriteString(fmt.Sprintf("[%s][%s] × %d — %s\n", g.Source, g.Level, g.Count, latest))
+  }
+
+  title := fmt.Sprintf(params.TitleAlert, today())
+  body := buf.String()
   var errMsgs []string
-  for i, batch := range batches {
-    title := fmt.Sprintf(params.TitleAlert, today())
-    if len(batches) > 1 {
-      title = fmt.Sprintf(params.TitleAlert+" (%d/%d)", today(), i+1, len(batches))
-    }
-    header := fmt.Sprintf(params.MsgHeader+"\n\n", params.Hours, len(entries))
-    if i > 0 {
-      header = fmt.Sprintf("（续 %d/%d）\n\n", i+1, len(batches))
-    }
-    if err := Notify(channels, title, header+batch); err != nil {
-      errMsgs = append(errMsgs, err.Error())
-    }
-    if i < len(batches)-1 {
-      time.Sleep(time.Second)
-    }
+  if err := Notify(channels, title, body); err != nil {
+    errMsgs = append(errMsgs, err.Error())
   }
 
   status := "ok"
@@ -305,7 +311,7 @@ func logAnalysisHandler(config string) error {
     status = "error"
     errMsg = strings.Join(errMsgs, "; ")
   }
-  summary := fmt.Sprintf("推送 %d 条日志（%d 批）", len(entries), len(batches))
+  summary := fmt.Sprintf("推送 %d 条日志（%d 类错误）", len(entries), len(order))
   addRecord(AnalysisRecord{Time: now(), Status: status, Summary: summary, Error: errMsg})
   return nil
 }

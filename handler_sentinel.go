@@ -38,8 +38,10 @@ func handleGetConfig(c *gin.Context) {
   cfgMu.RLock()
   safe := *cfg
   cfgMu.RUnlock()
-  if len(safe.LLM.APIKey) > 8 {
-    safe.LLM.APIKey = safe.LLM.APIKey[:4] + "****" + safe.LLM.APIKey[len(safe.LLM.APIKey)-4:]
+  for i := range safe.LLMProviders {
+    if len(safe.LLMProviders[i].APIKey) > 8 {
+      safe.LLMProviders[i].APIKey = safe.LLMProviders[i].APIKey[:4] + "****" + safe.LLMProviders[i].APIKey[len(safe.LLMProviders[i].APIKey)-4:]
+    }
   }
   for i := range safe.Notifications {
     if s := safe.Notifications[i].Secret; len(s) > 4 {
@@ -58,8 +60,10 @@ func handlePostConfig(c *gin.Context) {
     return
   }
   cfgMu.Lock()
-  if strings.Contains(newCfg.LLM.APIKey, "****") {
-    newCfg.LLM.APIKey = cfg.LLM.APIKey
+  for i := range newCfg.LLMProviders {
+    if strings.Contains(newCfg.LLMProviders[i].APIKey, "****") && i < len(cfg.LLMProviders) {
+      newCfg.LLMProviders[i].APIKey = cfg.LLMProviders[i].APIKey
+    }
   }
   for i := range newCfg.Notifications {
     if strings.Contains(newCfg.Notifications[i].Secret, "****") && i < len(cfg.Notifications) {
@@ -120,6 +124,8 @@ func handleGetStatus(c *gin.Context) {
     }
   }
 
+  llmConfigured := GetLLMProvider("") != nil
+
   c.JSON(http.StatusOK, gin.H{
     "sources_count":    len(co.LogSources),
     "channels_count":   len(co.Notifications),
@@ -129,7 +135,7 @@ func handleGetStatus(c *gin.Context) {
     "next_run":         nextRun,
     "last_run":         lastRun,
     "last_status":      lastStatus,
-    "llm_configured":   co.LLM.APIURL != "" && co.LLM.APIKey != "",
+    "llm_configured":   llmConfigured,
     "recent_history":   histCopy,
   })
 }
@@ -166,15 +172,29 @@ func handleTestCollect(c *gin.Context) {
 }
 
 func handleTestLLM(c *gin.Context) {
-  cfgMu.RLock()
-  llmCfg := cfg.LLM
-  cfgMu.RUnlock()
+  var req struct {
+    Index int `json:"index"`
+  }
+  c.ShouldBindJSON(&req)
 
-  if llmCfg.APIURL == "" || llmCfg.APIKey == "" {
+  var provider *LLMProvider
+  if req.Index >= 0 {
+    // 测试指定索引的提供商
+    cfgMu.RLock()
+    if req.Index < len(cfg.LLMProviders) {
+      provider = &cfg.LLMProviders[req.Index]
+    }
+    cfgMu.RUnlock()
+  } else {
+    // 测试当前日志分析配置的提供商
+    provider = GetLLMProvider(cfg.LogAnalysis.LLMProvider)
+  }
+
+  if provider == nil {
     c.JSON(http.StatusOK, gin.H{"ok": false, "error": "LLM 未配置"})
     return
   }
-  reply, err := CallLLM(llmCfg, "测试日志: [INFO] 系统运行正常", 1)
+  reply, err := CallLLM(provider, cfg.LogAnalysis.LLMPrompt, "测试日志: [INFO] 系统运行正常", 1)
   if err != nil {
     c.JSON(http.StatusOK, gin.H{"ok": false, "error": err.Error()})
     return
@@ -245,9 +265,10 @@ func runAnalysis() {
 
   var summary string
   var newIssues []Issue
-  if c.LLM.APIURL != "" && c.LLM.APIKey != "" {
+  provider := GetLLMProvider(c.LogAnalysis.LLMProvider)
+  if provider != nil {
     var err error
-    summary, err = CallLLM(c.LLM, logs, c.Schedule.LogHours)
+    summary, err = CallLLM(provider, c.LogAnalysis.LLMPrompt, logs, c.Schedule.LogHours)
     if err != nil {
       log.Printf("[opspanel] LLM failed: %v", err)
       summary = "⚠️ LLM 分析失败（" + err.Error() + "），原始日志摘要：\n\n" + truncate(logs, 3000)
