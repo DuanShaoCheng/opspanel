@@ -1429,7 +1429,10 @@ overview:`<h2>平台概述</h2>
 <table class="history-table">
 <thead><tr><th>模块</th><th>功能</th><th>状态</th></tr></thead>
 <tbody>
-<tr><td><b>日志分析</b></td><td>定时采集日志 → LLM 智能分析 → 多渠道告警推送</td><td><span class="tag tag-ok">可用</span></td></tr>
+<tr><td><b>日志采集</b></td><td>本地文件监控 + Filebeat 接收，自动分级，多节点隔离</td><td><span class="tag tag-ok">可用</span></td></tr>
+<tr><td><b>AI 分析</b></td><td>单条日志评分，定时批量汇总，多 LLM 提供商</td><td><span class="tag tag-ok">可用</span></td></tr>
+<tr><td><b>告警推送</b></td><td>飞书/企微/钉钉/Webhook/邮件多渠道通知</td><td><span class="tag tag-ok">可用</span></td></tr>
+<tr><td><b>定时任务</b></td><td>通用 Job 调度器，多任务并行，手动触发</td><td><span class="tag tag-ok">可用</span></td></tr>
 </tbody>
 </table>
 <h3 style="margin-top:16px">技术栈</h3>
@@ -1506,20 +1509,58 @@ api:`<h2>API 参考</h2>
 <tr><td>DELETE</td><td><code>/api/users/:id</code></td><td>删除</td></tr>
 </tbody>
 </table>
-<h3 style="margin-top:16px">日志分析</h3>
+<h3 style="margin-top:16px">日志采集</h3>
+<table class="history-table">
+<thead><tr><th>方法</th><th>路径</th><th>权限</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>GET</td><td><code>/api/logs</code></td><td>viewer</td><td>日志列表（分页、按级别/来源/服务器筛选）</td></tr>
+<tr><td>GET</td><td><code>/api/logs/:id</code></td><td>viewer</td><td>单条日志详情</td></tr>
+<tr><td>GET</td><td><code>/api/logs/stats</code></td><td>viewer</td><td>采集统计</td></tr>
+<tr><td>POST</td><td><code>/api/logs/:id/analyze</code></td><td>admin</td><td>单条日志 AI 分析</td></tr>
+<tr><td>POST</td><td><code>/api/logs/reclassify</code></td><td>admin</td><td>重新分类所有日志</td></tr>
+<tr><td>DELETE</td><td><code>/api/logs</code></td><td>admin</td><td>批量清除日志</td></tr>
+<tr><td>DELETE</td><td><code>/api/logs/:id</code></td><td>admin</td><td>删除单条日志</td></tr>
+</tbody>
+</table>
+<h3 style="margin-top:16px">配置与分析</h3>
 <table class="history-table">
 <thead><tr><th>方法</th><th>路径</th><th>权限</th><th>说明</th></tr></thead>
 <tbody>
 <tr><td>GET</td><td><code>/api/config</code></td><td>viewer</td><td>获取配置</td></tr>
 <tr><td>POST</td><td><code>/api/config</code></td><td>admin</td><td>保存配置</td></tr>
-<tr><td>GET</td><td><code>/api/status</code></td><td>viewer</td><td>状态</td></tr>
-<tr><td>POST</td><td><code>/api/trigger</code></td><td>admin</td><td>触发分析</td></tr>
-<tr><td>GET</td><td><code>/api/history</code></td><td>viewer</td><td>历史</td></tr>
+<tr><td>GET</td><td><code>/api/status</code></td><td>viewer</td><td>仪表盘状态</td></tr>
+<tr><td>POST</td><td><code>/api/trigger</code></td><td>admin</td><td>手动触发分析</td></tr>
+<tr><td>GET</td><td><code>/api/history</code></td><td>viewer</td><td>执行历史</td></tr>
+<tr><td>DELETE</td><td><code>/api/history</code></td><td>admin</td><td>清空历史</td></tr>
 <tr><td>GET/POST</td><td><code>/api/issues</code></td><td>viewer/admin</td><td>问题列表/更新状态</td></tr>
-<tr><td>POST</td><td><code>/api/test-*</code></td><td>admin</td><td>测试通知/采集/LLM</td></tr>
+<tr><td>POST</td><td><code>/api/test-notify</code></td><td>admin</td><td>测试通知</td></tr>
+<tr><td>POST</td><td><code>/api/test-collect</code></td><td>admin</td><td>测试采集</td></tr>
+<tr><td>POST</td><td><code>/api/test-llm</code></td><td>admin</td><td>测试 LLM</td></tr>
 </tbody>
 </table>
-<p style="margin-top:12px;font-size:.82rem;color:var(--text-muted)">除 /api/auth/login 和 /healthz 外，所有接口需要 Bearer token。</p>
+<h3 style="margin-top:16px">定时任务</h3>
+<table class="history-table">
+<thead><tr><th>方法</th><th>路径</th><th>权限</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>GET</td><td><code>/api/jobs</code></td><td>viewer</td><td>任务列表</td></tr>
+<tr><td>GET</td><td><code>/api/jobs/handlers</code></td><td>viewer</td><td>可用 handler</td></tr>
+<tr><td>GET</td><td><code>/api/jobs/modules</code></td><td>viewer</td><td>可用模块</td></tr>
+<tr><td>POST</td><td><code>/api/jobs</code></td><td>admin</td><td>创建任务</td></tr>
+<tr><td>PUT</td><td><code>/api/jobs/:id</code></td><td>admin</td><td>更新任务</td></tr>
+<tr><td>DELETE</td><td><code>/api/jobs/:id</code></td><td>admin</td><td>删除任务</td></tr>
+<tr><td>POST</td><td><code>/api/jobs/:id/run</code></td><td>admin</td><td>手动执行</td></tr>
+</tbody>
+</table>
+<h3 style="margin-top:16px">Ingest（Filebeat 兼容）</h3>
+<table class="history-table">
+<thead><tr><th>方法</th><th>路径</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>POST</td><td><code>/_bulk</code></td><td>ES Bulk API（Filebeat 推送入口）</td></tr>
+<tr><td>POST</td><td><code>/api/ingest</code></td><td>自定义日志接收（需 Bearer token）</td></tr>
+<tr><td>GET</td><td><code>/healthz</code></td><td>健康检查</td></tr>
+</tbody>
+</table>
+<p style="margin-top:12px;font-size:.82rem;color:var(--text-muted)">除 /api/auth/login、/healthz 和 /_bulk 外，所有接口需要 Bearer token。Ingest 端点通过 INGEST_API_KEY 环境变量单独认证。</p>
 </div>`,
 env:`<h2>环境变量</h2>
 <div class="card">
@@ -1527,43 +1568,68 @@ env:`<h2>环境变量</h2>
 <table class="history-table">
 <thead><tr><th>变量</th><th>默认</th><th>说明</th></tr></thead>
 <tbody>
-<tr><td><code>LOG_DIR</code></td><td>必填</td><td>宿主机日志目录</td></tr>
-<tr><td><code>LISTEN_PORT</code></td><td>9090</td><td>监听端口</td></tr>
-<tr><td><code>DB_DRIVER</code></td><td>sqlite</td><td>sqlite/mysql/postgres</td></tr>
-<tr><td><code>DB_DSN</code></td><td>/data/sentinel.db</td><td>连接串</td></tr>
-<tr><td><code>JWT_SECRET</code></td><td>内置</td><td>JWT 签名密钥</td></tr>
+<tr><td><code>DATA_DIR</code></td><td>/data</td><td>数据存储目录</td></tr>
+<tr><td><code>LISTEN_ADDR</code></td><td>:9090</td><td>服务监听地址</td></tr>
+<tr><td><code>LISTEN_PORT</code></td><td>9090</td><td>宿主机映射端口（docker-compose 用）</td></tr>
+<tr><td><code>LOG_DIR</code></td><td>/var/log</td><td>宿主机日志目录（docker-compose 挂载用）</td></tr>
+<tr><td><code>DB_DRIVER</code></td><td>sqlite</td><td>sqlite / mysql / postgres</td></tr>
+<tr><td><code>DB_DSN</code></td><td>/data/sentinel.db</td><td>数据库连接串</td></tr>
+<tr><td><code>JWT_SECRET</code></td><td>内置</td><td>JWT 签名密钥（生产环境务必修改）</td></tr>
+<tr><td><code>GIN_MODE</code></td><td>release</td><td>Gin 运行模式（debug/release）</td></tr>
+<tr><td><code>INGEST_API_KEY</code></td><td>—</td><td>Filebeat 接收端点认证密钥（为空则不校验）</td></tr>
 </tbody>
 </table>
-<h3 style="margin-top:16px">日志分析</h3>
+<h3 style="margin-top:16px">定时任务</h3>
+<table class="history-table">
+<thead><tr><th>变量</th><th>默认</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><code>LOG_SENTINEL_SCHEDULE_ENABLED</code></td><td>false</td><td>启用定时分析</td></tr>
+<tr><td><code>LOG_SENTINEL_SCHEDULE_CRON</code></td><td>0 9 * * *</td><td>Cron 表达式</td></tr>
+<tr><td><code>LOG_SENTINEL_SCHEDULE_HOURS</code></td><td>24</td><td>回溯小时数</td></tr>
+<tr><td><code>LOG_SENTINEL_SCHEDULE_MAX_BYTES</code></td><td>12000</td><td>单次采集最大字节数</td></tr>
+</tbody>
+</table>
+<h3 style="margin-top:16px">快速通知（仅当 config.json 中无渠道时生效）</h3>
 <table class="history-table">
 <thead><tr><th>变量</th><th>说明</th></tr></thead>
 <tbody>
-<tr><td><code>LOG_SENTINEL_LLM_URL</code></td><td>LLM API 地址</td></tr>
-<tr><td><code>LOG_SENTINEL_LLM_KEY</code></td><td>API Key</td></tr>
-<tr><td><code>LOG_SENTINEL_LLM_MODEL</code></td><td>模型名称</td></tr>
-<tr><td><code>LOG_SENTINEL_SCHEDULE_ENABLED</code></td><td>启用定时</td></tr>
-<tr><td><code>LOG_SENTINEL_SCHEDULE_CRON</code></td><td>Cron 表达式</td></tr>
-<tr><td><code>LOG_SENTINEL_NOTIFY_WEBHOOK</code></td><td>快速通知 URL</td></tr>
+<tr><td><code>LOG_SENTINEL_NOTIFY_TYPE</code></td><td>渠道类型（feishu/wecom/dingtalk/webhook）</td></tr>
+<tr><td><code>LOG_SENTINEL_NOTIFY_WEBHOOK</code></td><td>Webhook URL</td></tr>
+<tr><td><code>LOG_SENTINEL_NOTIFY_NAME</code></td><td>渠道名称</td></tr>
+<tr><td><code>LOG_SENTINEL_NOTIFY_SECRET</code></td><td>签名密钥</td></tr>
 </tbody>
 </table>
+<div style="background:var(--bg);padding:12px;border-radius:6px;margin-top:16px;border-left:3px solid var(--primary)">
+<p style="font-size:.82rem;color:var(--text-secondary)"><b>💡 提示：</b>LLM 配置已移至 Web 面板「系统 → LLM」管理，支持多提供商，不再通过环境变量设置。</p>
+</div>
 </div>`,
 'log-overview':`<h2>日志分析模块</h2>
 <div class="card">
 <p>OpsPanel 的核心模块，提供自动化日志监控和告警。</p>
 <h3 style="margin-top:16px">工作流程</h3>
 <pre style="background:var(--bg);padding:12px;border-radius:6px;font-size:.8rem;overflow-x:auto;color:var(--text-secondary)">
-Cron 调度 ──▶ 日志采集(增量) ──▶ LLM 分析(结构化) ──▶ 通知分发(多渠道)
-                  │                      │
-                  ▼                      ▼
-            scan_state              issues(问题列表)
+┌─────────────────────────────────────────────────────────────┐
+│  实时采集                                                     │
+│  本地文件监控(10s轮询) ──┐                                    │
+│  Filebeat 推送(ES API) ──┼──▶ 过滤+分级 ──▶ 存库(LogEntry)   │
+└──────────────────────────┼──────────────────────────────────┘
+                           │
+┌──────────────────────────┼──────────────────────────────────┐
+│  分析与告警               ▼                                   │
+│  单条 AI 分析 ──▶ 评分+说明 ──▶ 存库                          │
+│  定时批量汇总 ──▶ LLM 结构化 ──▶ 问题列表 ──▶ 多渠道推送      │
+└─────────────────────────────────────────────────────────────┘
 </pre>
 <h3 style="margin-top:16px">核心特性</h3>
 <ul>
-<li><b>增量扫描</b> — 记录偏移量，不重复分析</li>
-<li><b>多格式</b> — 纯文本、JSON、多行堆栈</li>
-<li><b>多渠道</b> — 飞书、企微、钉钉、Webhook</li>
-<li><b>LLM 分析</b> — 兼容 OpenAI 格式，输出结构化问题</li>
+<li><b>双采集模式</b> — 本地文件增量监控 + Filebeat 远程推送</li>
+<li><b>多节点隔离</b> — 按 server_id 区分服务器，上下文不混</li>
+<li><b>自动分级</b> — 可配置关键词规则分类 crash/error/warn</li>
+<li><b>单条 AI 分析</b> — 对单条日志评分(1-10)并给出分析说明</li>
+<li><b>定时批量推送</b> — 汇总时间窗口内日志，LLM 分析后推送通知</li>
+<li><b>多 LLM 提供商</b> — 兼容 OpenAI 格式，Web 面板管理多个配置</li>
 <li><b>问题追踪</b> — P0-P3 优先级，含原因和影响</li>
+<li><b>多渠道通知</b> — 飞书、企微、钉钉、Webhook、邮件</li>
 </ul>
 </div>`,
 'sources-doc':`<h2>日志源配置</h2>
@@ -1827,29 +1893,57 @@ systemctl start filebeat
 </div>`,
 'llm-doc':`<h2>LLM 配置</h2>
 <div class="card">
-<p>兼容 OpenAI chat/completions 格式。</p>
+<p>OpsPanel 支持配置多个 LLM 提供商，在 Web 面板「系统 → LLM」中管理。兼容 OpenAI chat/completions 格式的任意 API。</p>
+<h3 style="margin-top:16px">支持的服务</h3>
 <table class="history-table">
-<thead><tr><th>服务</th><th>API 地址</th><th>模型</th></tr></thead>
+<thead><tr><th>服务</th><th>API 地址</th><th>模型示例</th></tr></thead>
 <tbody>
-<tr><td>DeepSeek</td><td>api.deepseek.com/v1/chat/completions</td><td>deepseek-chat</td></tr>
-<tr><td>通义千问</td><td>dashscope.aliyuncs.com/compatible-mode/v1/chat/completions</td><td>qwen-plus</td></tr>
-<tr><td>OpenAI</td><td>api.openai.com/v1/chat/completions</td><td>gpt-4o-mini</td></tr>
+<tr><td>DeepSeek</td><td>https://api.deepseek.com/v1/chat/completions</td><td>deepseek-chat</td></tr>
+<tr><td>通义千问</td><td>https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions</td><td>qwen-plus</td></tr>
+<tr><td>OpenAI</td><td>https://api.openai.com/v1/chat/completions</td><td>gpt-4o-mini</td></tr>
+<tr><td>本地部署</td><td>http://localhost:11434/v1/chat/completions</td><td>llama3 等</td></tr>
 </tbody>
 </table>
-<p style="margin-top:12px">不配置 LLM 时仍可运行，直接推送原始日志摘要。</p>
+<h3 style="margin-top:16px">配置步骤</h3>
+<ol>
+<li>进入「系统 → LLM」页面</li>
+<li>点击「+ 添加提供商」</li>
+<li>填写名称、API 地址、API Key、模型名称</li>
+<li>保存后点击「测试」验证连通性</li>
+<li>在「日志分析 → AI 配置」中选择要使用的提供商</li>
+</ol>
+<h3 style="margin-top:16px">使用场景</h3>
+<ul>
+<li><b>单条日志分析</b> — 在采集日志详情中点击「AI 分析」，对单条日志评分并给出分析</li>
+<li><b>定时批量分析</b> — 定时任务汇总日志后调用 LLM 输出结构化问题列表</li>
+</ul>
+<p style="margin-top:12px;font-size:.82rem;color:var(--text-muted)">不配置 LLM 时仍可运行，定时推送会直接发送原始日志摘要。</p>
 </div>`,
 'schedule-doc':`<h2>定时任务</h2>
 <div class="card">
-<p>标准 5 字段 Cron：<code>分 时 日 月 周</code></p>
+<p>OpsPanel 内置通用 Job 调度器，支持多任务并行、手动触发、持久化。在「系统 → 定时任务」中管理。</p>
+<h3 style="margin-top:16px">Cron 表达式</h3>
+<p>标准 5 字段格式：<code>分 时 日 月 周</code></p>
 <table class="history-table">
 <thead><tr><th>表达式</th><th>含义</th></tr></thead>
 <tbody>
 <tr><td><code>0 9 * * *</code></td><td>每天 9:00</td></tr>
 <tr><td><code>*/30 * * * *</code></td><td>每 30 分钟</td></tr>
 <tr><td><code>0 9 * * 1-5</code></td><td>工作日 9:00</td></tr>
+<tr><td><code>0 9,18 * * *</code></td><td>每天 9:00 和 18:00</td></tr>
 </tbody>
 </table>
-<p style="margin-top:12px"><b>日志上限</b>：发送给 LLM 的最大字节数，建议 8000-16000。</p>
+<h3 style="margin-top:16px">内置 Handler</h3>
+<ul>
+<li><b>日志采集推送（log-analysis）</b> — 汇总时间窗口内的日志，调用 LLM 分析后推送通知</li>
+</ul>
+<h3 style="margin-top:16px">操作</h3>
+<ul>
+<li>创建/编辑任务：选择 handler、设置 cron 表达式、启用/禁用</li>
+<li>手动执行：点击「运行」立即触发一次</li>
+<li>查看历史：在「推送记录」中查看每次执行结果</li>
+</ul>
+<p style="margin-top:12px;font-size:.82rem;color:var(--text-muted)"><b>日志上限：</b>发送给 LLM 的最大字节数，建议 8000-16000。超出部分会被截断。</p>
 </div>`,
 'issues-doc':`<h2>问题管理</h2>
 <div class="card">
