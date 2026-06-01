@@ -122,6 +122,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-
 .history-table td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text)}
 .history-table tr:hover td{background:var(--sidebar-active-bg)}
 .history-detail{background:var(--bg);padding:12px;border-radius:8px;margin-top:8px;font-size:.82rem;white-space:pre-wrap;word-break:break-all;max-height:500px;overflow-y:auto;color:var(--text-secondary)}
+.log-detail-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;padding:14px;background:var(--bg);border-radius:10px;margin-bottom:16px}
+.log-detail-meta-item{display:flex;flex-direction:column;gap:2px}
+.log-detail-meta-label{font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em}
+.log-detail-meta-value{font-size:.84rem;color:var(--text)}
+.log-detail-section{margin-bottom:12px;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.log-detail-section-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;user-select:none;background:var(--bg)}
+.log-detail-section-header h4{font-size:.84rem;font-weight:600;color:var(--text-secondary);margin:0}
+.log-detail-toggle{font-size:.7rem;color:var(--text-muted);transition:transform .2s}
+.log-detail-section.collapsed .log-detail-toggle{transform:rotate(-90deg)}
+.log-detail-section.collapsed .log-detail-content{display:none}
+.log-detail-content{padding:12px 14px;font-size:.82rem;white-space:pre-wrap;word-break:break-all;max-height:400px;overflow-y:auto;color:var(--text-secondary);line-height:1.5}
+.log-detail-ai{border-color:rgba(59,130,246,.3)}
+.log-detail-ai .log-detail-section-header{background:rgba(59,130,246,.05)}
+.log-detail-actions{display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)}
 .empty{text-align:center;padding:40px;color:var(--text-muted)}
 .empty-icon{font-size:2rem;margin-bottom:8px}
 .login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)}
@@ -234,7 +248,7 @@ function toggleSidebar(){
 }
 function buildNav(){
   const nav=document.getElementById('sidebar-nav');
-  const curPage=(location.hash||'#/').replace('#/','').split('/')[0]||'dashboard';
+  const curPage=(location.hash||'#/').replace('#/','').split(/[/?]/)[0]||'dashboard';
   const logPages=['sources','collected','log-levels','log-ai','log-notify','history'];
   const logOpen=logPages.includes(curPage);
   let html='';
@@ -321,7 +335,7 @@ function renderLogin(){
 // === Router ===
 function router(){
   const hash=location.hash||'#/';
-  const page=hash.replace('#/','').split('/')[0]||'dashboard';
+  const page=hash.replace('#/','').split(/[/?]/)[0]||'dashboard';
   if(!isLoggedIn()){
     if(page!=='login')location.hash='#/login';
     renderLogin();
@@ -398,6 +412,40 @@ document.getElementById('modal-overlay').onclick=e=>{if(e.target===e.currentTarg
 // === Utils ===
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function escHtml(s){return esc(s).replace(/\n/g,'<br>');}
+function formatAnalysis(s){
+  if(!s)return'';
+  s=s.trim();
+  // 尝试解析 JSON 并格式化为可读文本
+  try{
+    var obj=JSON.parse(s);
+    if(typeof obj==='object'&&obj!==null){
+      return formatAnalysisObj(obj);
+    }
+  }catch(e){}
+  // 非 JSON，转义并保留换行
+  return esc(s).replace(/\n/g,'<br>');
+}
+function formatAnalysisObj(obj){
+  if(Array.isArray(obj)){
+    return obj.map((item,i)=>{
+      if(typeof item==='object'&&item!==null)return`<div style="margin-bottom:10px;padding:8px 12px;background:var(--bg);border-radius:6px"><b>#${i+1}</b><br>`+formatAnalysisObj(item)+'</div>';
+      return esc(String(item));
+    }).join('');
+  }
+  var lines=[];
+  var labelMap={score:'评分',analysis:'分析',root_cause:'根因',cause:'原因',impact:'影响',suggestion:'建议',fix:'修复方案',title:'标题',priority:'优先级',summary:'摘要',description:'描述',solution:'解决方案',raw_log:'原始日志'};
+  for(var k in obj){
+    if(!obj.hasOwnProperty(k))continue;
+    var v=obj[k];
+    var label=labelMap[k]||k;
+    if(typeof v==='object'&&v!==null){
+      lines.push('<b>'+esc(label)+':</b><div style="margin-left:12px">'+formatAnalysisObj(v)+'</div>');
+    }else{
+      lines.push('<b>'+esc(label)+':</b> '+esc(String(v)).replace(/\n/g,'<br>'));
+    }
+  }
+  return lines.join('<br>');
+}
 function fmtTag(f){return`<span class="tag tag-${f||'plain'}">${f||'plain'}</span>`;}
 function chTag(t){return`<span class="tag tag-${t}">${t}</span>`;}
 function stTag(s){return`<span class="tag tag-${s}">${s==='ok'?'成功':'失败'}</span>`;}
@@ -541,7 +589,7 @@ async function renderCollected(el){
           <option value="crash" ${level==='crash'?'selected':''}>crash</option>
           <option value="error" ${level==='error'?'selected':''}>error</option>
           <option value="warn" ${level==='warn'?'selected':''}>warn</option>
-          <option value="info" ${level==='info'?'selected':''}>info</option>
+          <option value="undefined" ${level==='undefined'?'selected':''}>undefined</option>
         </select>
         ${isAdmin()?`<button class="btn btn-sm btn-danger" onclick="batchDeleteLogs()">批量删除</button>
         <button class="btn btn-sm btn-outline" onclick="clearCollected()">清理已分析</button>`:''}
@@ -568,7 +616,7 @@ async function renderCollected(el){
       ${page*30<r.total?`<button class="btn btn-sm btn-outline" onclick="COLLECTED_PAGE++;router()">下一页</button>`:''}
     </div>`:'<div class="empty"><div class="empty-icon">📋</div>暂无采集到的日志<p style="font-size:.82rem;margin-top:8px">采集器正在监听日志文件，匹配到错误时会自动记录</p></div>'}`;
 }
-function levelColor(l){switch(l){case 'crash':return'#dc2626';case 'error':return'#ea580c';case 'warn':return'#ca8a04';default:return'#6b7280';}}
+function levelColor(l){switch(l){case 'crash':return'#dc2626';case 'error':return'#ea580c';case 'warn':return'#ca8a04';case 'undefined':return'#94a3b8';default:return'#6b7280';}}
 function scoreColor(s){if(s>=8)return'#dc2626';if(s>=5)return'#ea580c';if(s>=3)return'#ca8a04';return'#22c55e';}
 function filterCollectedLevel(v){
   COLLECTED_PAGE=1;
@@ -600,28 +648,45 @@ async function batchDeleteLogs(){
 }
 async function showLogDetail(id){
   const e=await api('/api/logs/'+id);
+  const metaItems=[
+    {label:'级别',value:`<span class="tag" style="background:${levelColor(e.level)}">${esc(e.level)}</span>`},
+    {label:'服务器',value:esc(e.host||'-')},
+    {label:'来源',value:`<code style="font-size:.78rem">${esc(e.file||e.source)}</code>`},
+    {label:'时间',value:esc(e.created_at||'').replace('T',' ').substring(0,19)},
+  ];
+  if(e.ai_score){metaItems.push({label:'AI 评分',value:`<b style="color:${scoreColor(e.ai_score)};font-size:1.1rem">${e.ai_score}/10</b>`});}
+
+  const contentExpanded=e.content.length>200;
+  const contextExpanded=e.context&&e.context.length>200;
+
   showModal('日志详情',`
-    <div style="margin-bottom:12px">
-      <span class="tag" style="background:${levelColor(e.level)}">${esc(e.level)}</span>
-      <span style="font-size:.82rem;color:var(--text-muted);margin-left:8px">${esc(e.created_at||'').replace('T',' ').substring(0,19)}</span>
-      <span style="font-size:.82rem;color:var(--text-muted);margin-left:8px">${esc(e.source)} / ${esc(e.file)}</span>
-      ${e.ai_score?`<span style="margin-left:12px;font-weight:600;color:${scoreColor(e.ai_score)}">评分: ${e.ai_score}/10</span>`:''}
+    <div class="log-detail-meta">
+      ${metaItems.map(m=>`<div class="log-detail-meta-item"><span class="log-detail-meta-label">${m.label}</span><span class="log-detail-meta-value">${m.value}</span></div>`).join('')}
     </div>
-    <div style="margin-bottom:16px">
-      <h4 style="font-size:.84rem;margin-bottom:6px;color:var(--text-secondary)">匹配行</h4>
-      <div class="history-detail" style="border-left:3px solid ${levelColor(e.level)}">${esc(e.content)}</div>
+    <div class="log-detail-section">
+      <div class="log-detail-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+        <h4>匹配内容</h4>
+        <span class="log-detail-toggle">▼</span>
+      </div>
+      <div class="log-detail-content" style="border-left:3px solid ${levelColor(e.level)}">${esc(e.content)}</div>
     </div>
-    ${e.context?`<div style="margin-bottom:16px">
-      <h4 style="font-size:.84rem;margin-bottom:6px;color:var(--text-secondary)">上下文</h4>
-      <div class="history-detail">${esc(e.context)}</div>
+    ${e.context?`<div class="log-detail-section${contextExpanded?' collapsed':''}">
+      <div class="log-detail-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+        <h4>上下文 <span style="font-weight:400;font-size:.76rem;color:var(--text-muted)">(${e.context.split('\\n').length} 行)</span></h4>
+        <span class="log-detail-toggle">▼</span>
+      </div>
+      <div class="log-detail-content">${esc(e.context)}</div>
     </div>`:''}
-    ${e.ai_analysis?`<div style="margin-bottom:16px">
-      <h4 style="font-size:.84rem;margin-bottom:6px;color:var(--text-secondary)">AI 分析</h4>
-      <div class="history-detail" style="border-left:3px solid var(--primary)">${esc(e.ai_analysis)}</div>
+    ${e.ai_analysis?`<div class="log-detail-section log-detail-ai">
+      <div class="log-detail-section-header">
+        <h4>🤖 AI 分析</h4>
+      </div>
+      <div class="log-detail-content" style="border-left:3px solid var(--primary)">${formatAnalysis(e.ai_analysis)}</div>
     </div>`:''}
-    <div class="btn-group">
+    <div class="log-detail-actions">
       ${isAdmin()&&!e.analyzed?`<button class="btn btn-primary" onclick="analyzeLog(${e.id})" ${!STATUS.llm_configured?'disabled title="请先配置 LLM"':''}>🤖 AI 分析</button>`:''}
       ${isAdmin()&&e.analyzed?`<button class="btn btn-outline" onclick="analyzeLog(${e.id})" ${!STATUS.llm_configured?'disabled title="请先配置 LLM"':''}>🔄 重新分析</button>`:''}
+      ${isAdmin()?`<button class="btn btn-danger" onclick="closeModal();deleteLog(${e.id})">删除</button>`:''}
       <button class="btn btn-outline" onclick="closeModal()">关闭</button>
     </div>
   `);

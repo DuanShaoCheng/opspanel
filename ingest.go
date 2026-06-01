@@ -35,6 +35,9 @@ type pendingMatch struct {
   matchIdx int
   matchAt  time.Time
   need     int
+  source   string
+  host     string
+  file     string
 }
 
 var ingestBuffer *lineBuffer
@@ -214,7 +217,7 @@ func processIngestDoc(doc map[string]interface{}) {
   file := getNestedStr(doc, "log.file.path")
   if file == "" { file = source }
 
-  key := source + "|" + file
+  key := host + "|" + source + "|" + file
   ingestBuffer.addLine(key, source, host, file, message)
 }
 
@@ -230,7 +233,7 @@ func (lb *lineBuffer) addLine(key, source, host, file, content string) {
   if len(fb.lines) > bufferSize { fb.lines = fb.lines[len(fb.lines)-bufferSize:] }
   curIdx := len(fb.lines) - 1
   if ingestFilter != nil && ingestFilter.MatchString(content) {
-    fb.pending = append(fb.pending, pendingMatch{matchIdx: curIdx, matchAt: time.Now(), need: 2})
+    fb.pending = append(fb.pending, pendingMatch{matchIdx: curIdx, matchAt: time.Now(), need: 2, source: source, host: host, file: file})
   }
   var completed []pendingMatch
   var remaining []pendingMatch
@@ -242,7 +245,7 @@ func (lb *lineBuffer) addLine(key, source, host, file, content string) {
     }
   }
   fb.pending = remaining
-  for _, p := range completed { lb.storeMatch(fb, p, source, host, file) }
+  for _, p := range completed { lb.storeMatch(fb, p, p.source, p.host, p.file) }
 }
 
 func (lb *lineBuffer) storeMatch(fb *fileBuffer, p pendingMatch, source, host, file string) {
@@ -267,7 +270,9 @@ func (lb *lineBuffer) cleanup() {
     var remaining []pendingMatch
     for _, p := range fb.pending {
       if time.Since(p.matchAt) > 30*time.Second {
-        lb.storeMatch(fb, p, key, "", key)
+        source := p.source
+        if source == "" { source = key }
+        lb.storeMatch(fb, p, source, p.host, p.file)
       } else {
         remaining = append(remaining, p)
       }

@@ -143,6 +143,7 @@ func (w *Watcher) filterAndStore(data string, source, file, filter string) {
     }
     entry := LogEntry{
       Source:  source,
+      Host:    source,
       File:    file,
       Content: line,
       Level:   classifyLevel(line),

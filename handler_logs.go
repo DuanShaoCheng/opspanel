@@ -17,6 +17,7 @@ func RegisterLogRoutes(r *gin.RouterGroup) {
     logs.GET("/:id", handleGetLogDetail)
     logs.GET("/stats", handleLogStats)
     logs.POST("/:id/analyze", AdminOnly(), handleAnalyzeLog)
+    logs.POST("/reclassify", AdminOnly(), handleReclassify)
     logs.DELETE("", AdminOnly(), handleClearLogs)
     logs.DELETE("/:id", AdminOnly(), handleDeleteLog)
   }
@@ -119,25 +120,36 @@ func handleAnalyzeLog(c *gin.Context) {
 
   // 解析 LLM 返回的 JSON
   var result struct {
-    Score    int    `json:"score"`
-    Analysis string `json:"analysis"`
+    Score    int         `json:"score"`
+    Analysis interface{} `json:"analysis"`
   }
   jsonStr := extractJSON(reply)
+  var analysisText string
   if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
     result.Score = 5
-    result.Analysis = reply
+    analysisText = reply
+  } else {
+    switch v := result.Analysis.(type) {
+    case string:
+      analysisText = v
+    default:
+      // analysis 是对象/数组时，转为可读文本
+      b, _ := json.MarshalIndent(v, "", "  ")
+      analysisText = string(b)
+    }
   }
+  if result.Score == 0 { result.Score = 5 }
 
   db.Model(&entry).Updates(map[string]interface{}{
     "ai_score":    result.Score,
-    "ai_analysis": result.Analysis,
+    "ai_analysis": analysisText,
     "analyzed":    true,
   })
 
   c.JSON(http.StatusOK, gin.H{
     "ok":       true,
     "score":    result.Score,
-    "analysis": result.Analysis,
+    "analysis": analysisText,
   })
 }
 
@@ -201,4 +213,18 @@ func handleDeleteLog(c *gin.Context) {
     return
   }
   c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func handleReclassify(c *gin.Context) {
+  var entries []LogEntry
+  db.Select("id", "content").Find(&entries)
+  count := 0
+  for _, e := range entries {
+    newLevel := classifyLevel(e.Content)
+    if newLevel != e.Level {
+      db.Model(&LogEntry{}).Where("id = ?", e.ID).Update("level", newLevel)
+      count++
+    }
+  }
+  c.JSON(http.StatusOK, gin.H{"ok": true, "total": len(entries), "updated": count})
 }
