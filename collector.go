@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -323,29 +324,39 @@ func TestCollect(src LogSource) TestCollectResult {
 	}
 }
 
-// classifyLevel 根据日志内容自动分类级别
+// classifyLevel 根据配置的规则分类日志级别
 func classifyLevel(line string) string {
 	lower := strings.ToLower(line)
-	if strings.Contains(lower, "crash") || strings.Contains(lower, "崩溃") || strings.Contains(lower, "crasher") {
-		return "crash"
-	}
-	if strings.Contains(lower, "error") || strings.Contains(lower, "错误") || strings.Contains(lower, "fatal") {
-		return "error"
-	}
-	if strings.Contains(lower, "warn") || strings.Contains(lower, "warning") {
-		return "warn"
+	cfgMu.RLock()
+	rules := cfg.LevelRules
+	cfgMu.RUnlock()
+	for _, rule := range rules {
+		for _, kw := range rule.Keywords {
+			if strings.Contains(lower, strings.ToLower(kw)) {
+				return rule.Level
+			}
+		}
 	}
 	return "info"
 }
 
 // matchFilter 检查行是否匹配过滤正则
+var filterCache sync.Map // map[string]*regexp.Regexp
+
 func matchFilter(line, filter string) bool {
 	if filter == "" {
 		return true
 	}
-	re, err := regexp.Compile("(?i)" + filter)
-	if err != nil {
-		return strings.Contains(strings.ToLower(line), strings.ToLower(filter))
+	var re *regexp.Regexp
+	if cached, ok := filterCache.Load(filter); ok {
+		re = cached.(*regexp.Regexp)
+	} else {
+		var err error
+		re, err = regexp.Compile("(?i)" + filter)
+		if err != nil {
+			return strings.Contains(strings.ToLower(line), strings.ToLower(filter))
+		}
+		filterCache.Store(filter, re)
 	}
 	return re.MatchString(line)
 }

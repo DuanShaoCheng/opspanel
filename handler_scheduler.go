@@ -2,6 +2,7 @@ package main
 
 import (
   "net/http"
+  "strconv"
 
   "github.com/gin-gonic/gin"
 )
@@ -70,7 +71,11 @@ func handleCreateJob(c *gin.Context) {
 }
 
 func handleUpdateJob(c *gin.Context) {
-  id := c.Param("id")
+  id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+  if err != nil {
+    c.JSON(http.StatusBadRequest, gin.H{"error": "无效的任务 ID"})
+    return
+  }
   var job Job
   if err := db.First(&job, id).Error; err != nil {
     c.JSON(http.StatusNotFound, gin.H{"error": "任务不存在"})
@@ -96,7 +101,11 @@ func handleUpdateJob(c *gin.Context) {
 }
 
 func handleDeleteJob(c *gin.Context) {
-  id := c.Param("id")
+  id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+  if err != nil {
+    c.JSON(http.StatusBadRequest, gin.H{"error": "无效的任务 ID"})
+    return
+  }
   var job Job
   if err := db.First(&job, id).Error; err != nil {
     c.JSON(http.StatusNotFound, gin.H{"error": "任务不存在"})
@@ -108,7 +117,11 @@ func handleDeleteJob(c *gin.Context) {
 }
 
 func handleRunJob(c *gin.Context) {
-  id := c.Param("id")
+  id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+  if err != nil {
+    c.JSON(http.StatusBadRequest, gin.H{"error": "无效的任务 ID"})
+    return
+  }
   var job Job
   if err := db.First(&job, id).Error; err != nil {
     c.JSON(http.StatusNotFound, gin.H{"error": "任务不存在"})

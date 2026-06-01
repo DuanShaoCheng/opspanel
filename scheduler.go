@@ -250,7 +250,7 @@ func logAnalysisHandler(config string) error {
 
   cutoff := time.Now().Add(-time.Duration(params.Hours) * time.Hour)
   var entries []LogEntry
-  db.Where("created_at >= ?", cutoff).Order("id asc").Find(&entries)
+  db.Where("created_at >= ?", cutoff).Order("id asc").Limit(5000).Find(&entries)
 
   channels := GetLogAnalysisChannels()
   if len(channels) == 0 {

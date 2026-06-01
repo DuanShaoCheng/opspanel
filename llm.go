@@ -30,15 +30,23 @@ const structuredPrompt = `你是一个服务器运维专家。请分析以下错
 
 // CallLLM 调用 LLM 获取结构化分析结果
 func CallLLM(provider *LLMProvider, systemPrompt string, logs string, hours int) (string, error) {
-	if provider == nil || provider.APIURL == "" || provider.APIKey == "" {
-		return "", fmt.Errorf("LLM not configured")
-	}
-
 	if systemPrompt == "" {
 		systemPrompt = structuredPrompt
 	}
-
 	userMsg := fmt.Sprintf("以下是过去 %d 小时的错误日志：\n\n%s", hours, logs)
+	return callLLMCore(provider, systemPrompt, userMsg)
+}
+
+// CallLLMWithProvider 使用 LLMProvider 调用 LLM
+func CallLLMWithProvider(provider *LLMProvider, systemPrompt, userMsg string) (string, error) {
+	return callLLMCore(provider, systemPrompt, userMsg)
+}
+
+// callLLMCore 核心 LLM 调用实现
+func callLLMCore(provider *LLMProvider, systemPrompt, userMsg string) (string, error) {
+	if provider == nil || provider.APIURL == "" || provider.APIKey == "" {
+		return "", fmt.Errorf("LLM not configured")
+	}
 
 	payload := map[string]interface{}{
 		"model": provider.Model,
@@ -51,7 +59,18 @@ func CallLLM(provider *LLMProvider, systemPrompt string, logs string, hours int)
 	}
 
 	body, _ := json.Marshal(payload)
-	req, _ := http.NewRequest("POST", provider.APIURL, bytes.NewReader(body))
+
+	// 自动补全 API URL 路径
+	url := provider.APIURL
+	if !strings.HasSuffix(url, "/completions") {
+		if strings.HasSuffix(url, "/v1") {
+			url += "/chat/completions"
+		} else {
+			url += "/v1/chat/completions"
+		}
+	}
+
+	req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+provider.APIKey)
 
@@ -77,21 +96,18 @@ func CallLLM(provider *LLMProvider, systemPrompt string, logs string, hours int)
 			Text string `json:"text"`
 		} `json:"content"`
 	}
-	json.Unmarshal(respBody, &result)
-
-	var content string
-	if len(result.Choices) > 0 && result.Choices[0].Message.Content != "" {
-		content = result.Choices[0].Message.Content
-	} else if len(result.Content) > 0 && result.Content[0].Text != "" {
-		content = result.Content[0].Text
-	} else {
-		return "", fmt.Errorf("empty response: %s", truncate(string(respBody), 200))
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return "", fmt.Errorf("parse response failed: %w", err)
 	}
 
-	return content, nil
+	if len(result.Choices) > 0 && result.Choices[0].Message.Content != "" {
+		return result.Choices[0].Message.Content, nil
+	}
+	if len(result.Content) > 0 && result.Content[0].Text != "" {
+		return result.Content[0].Text, nil
+	}
+	return "", fmt.Errorf("empty response: %s", truncate(string(respBody), 200))
 }
-
-// ParseIssuesFromLLM 尝试从 LLM 返回内容中解析结构化问题列表
 func ParseIssuesFromLLM(content string) []Issue {
 	// 提取 JSON 部分（LLM 可能包裹在 markdown code block 中）
 	jsonStr := content
@@ -129,59 +145,3 @@ func ParseIssuesFromLLM(content string) []Issue {
 	return issues
 }
 
-// CallLLMWithProvider 使用 LLMProvider 调用 LLM
-func CallLLMWithProvider(provider *LLMProvider, systemPrompt, userMsg string) (string, error) {
-	if provider == nil || provider.APIURL == "" || provider.APIKey == "" {
-		return "", fmt.Errorf("LLM not configured")
-	}
-
-	payload := map[string]interface{}{
-		"model": provider.Model,
-		"messages": []map[string]string{
-			{"role": "system", "content": systemPrompt},
-			{"role": "user", "content": userMsg},
-		},
-		"max_tokens":  2000,
-		"temperature": 0.1,
-	}
-
-	body, _ := json.Marshal(payload)
-	url := provider.APIURL
-	if !strings.HasSuffix(url, "/completions") {
-		if strings.HasSuffix(url, "/v1") {
-			url += "/chat/completions"
-		} else {
-			url += "/v1/chat/completions"
-		}
-	}
-
-	req, _ := http.NewRequest("POST", url, bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+provider.APIKey)
-
-	client := &http.Client{Timeout: 90 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, truncate(string(respBody), 200))
-	}
-
-	var result struct {
-		Choices []struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		} `json:"choices"`
-	}
-	json.Unmarshal(respBody, &result)
-
-	if len(result.Choices) > 0 && result.Choices[0].Message.Content != "" {
-		return result.Choices[0].Message.Content, nil
-	}
-	return "", fmt.Errorf("empty response: %s", truncate(string(respBody), 200))
-}

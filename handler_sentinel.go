@@ -5,6 +5,7 @@ import (
   "fmt"
   "log"
   "net/http"
+  "strconv"
   "strings"
   "time"
 
@@ -31,23 +32,48 @@ func RegisterSentinelRoutes(r *gin.RouterGroup) {
     write.POST("/test-collect", handleTestCollect)
     write.POST("/test-llm", handleTestLLM)
     write.POST("/issues", handlePostIssues)
+    write.DELETE("/history", handleClearHistory)
+    write.DELETE("/history/:index", handleDeleteHistoryItem)
   }
 }
 
 func handleGetConfig(c *gin.Context) {
   cfgMu.RLock()
-  safe := *cfg
-  cfgMu.RUnlock()
-  for i := range safe.LLMProviders {
+  defer cfgMu.RUnlock()
+
+  // 深拷贝配置以避免修改原始数据
+  safe := Config{
+    LogSources:       append([]LogSource{}, cfg.LogSources...),
+    Notifications:    make([]Notification, len(cfg.Notifications)),
+    LLMProviders:     make([]LLMProvider, len(cfg.LLMProviders)),
+    Schedule:         cfg.Schedule,
+    SMTP:             cfg.SMTP,
+    LogAnalysis:      cfg.LogAnalysis,
+    HostFieldOptions: cfg.HostFieldOptions,
+    LevelRules:       cfg.LevelRules,
+  }
+
+  // 如果提示词为空，返回默认提示词供前端展示
+  if safe.LogAnalysis.LLMPrompt == "" {
+    safe.LogAnalysis.LLMPrompt = structuredPrompt
+  }
+
+  // 深拷贝并脱敏 LLM Providers
+  for i := range cfg.LLMProviders {
+    safe.LLMProviders[i] = cfg.LLMProviders[i]
     if len(safe.LLMProviders[i].APIKey) > 8 {
       safe.LLMProviders[i].APIKey = safe.LLMProviders[i].APIKey[:4] + "****" + safe.LLMProviders[i].APIKey[len(safe.LLMProviders[i].APIKey)-4:]
     }
   }
-  for i := range safe.Notifications {
+
+  // 深拷贝并脱敏 Notifications
+  for i := range cfg.Notifications {
+    safe.Notifications[i] = cfg.Notifications[i]
     if s := safe.Notifications[i].Secret; len(s) > 4 {
       safe.Notifications[i].Secret = s[:2] + "****"
     }
   }
+
   c.JSON(http.StatusOK, safe)
 }
 
@@ -72,10 +98,12 @@ func handlePostConfig(c *gin.Context) {
   }
   *cfg = newCfg
   SaveConfig(cfg)
+  schedEnabled := cfg.Schedule.Enabled
+  schedCron := cfg.Schedule.CronExpr
   cfgMu.Unlock()
 
-  if cfg.Schedule.Enabled && cfg.Schedule.CronExpr != "" {
-    setCron(cfg.Schedule.CronExpr)
+  if schedEnabled && schedCron != "" {
+    setCron(schedCron)
   } else {
     clearCron()
   }
@@ -91,6 +119,32 @@ func handleGetHistory(c *gin.Context) {
   histMu.RLock()
   defer histMu.RUnlock()
   c.JSON(http.StatusOK, history)
+}
+
+func handleClearHistory(c *gin.Context) {
+  histMu.Lock()
+  history = []AnalysisRecord{}
+  SaveHistory(history)
+  histMu.Unlock()
+  c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func handleDeleteHistoryItem(c *gin.Context) {
+  idx, err := strconv.Atoi(c.Param("index"))
+  if err != nil {
+    c.JSON(http.StatusBadRequest, gin.H{"error": "invalid index"})
+    return
+  }
+  histMu.Lock()
+  if idx < 0 || idx >= len(history) {
+    histMu.Unlock()
+    c.JSON(http.StatusBadRequest, gin.H{"error": "index out of range"})
+    return
+  }
+  history = append(history[:idx], history[idx+1:]...)
+  SaveHistory(history)
+  histMu.Unlock()
+  c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 func handleGetStatus(c *gin.Context) {
@@ -116,11 +170,31 @@ func handleGetStatus(c *gin.Context) {
     lastStatus = histCopy[0].Status
   }
 
+  // 从新的 scheduler 系统获取定时任务状态
+  var jobs []Job
+  db.Where("enabled = ?", true).Find(&jobs)
+
+  var scheduleEnabled bool
+  var scheduleName string
+  var scheduleCron string
   var nextRun string
-  if cronEntryID != 0 {
-    entry := cronScheduler.Entry(cronEntryID)
-    if !entry.Next.IsZero() {
-      nextRun = entry.Next.Format("2006-01-02 15:04:05")
+
+  if len(jobs) > 0 {
+    // 使用第一个启用的任务作为主要显示
+    job := jobs[0]
+    scheduleEnabled = true
+    scheduleName = job.Name
+    scheduleCron = job.CronExpr
+    nextRun = scheduler.GetNextRun(job.ID)
+  } else {
+    // 如果没有启用的任务，检查是否有任何任务存在
+    var allJobs []Job
+    db.Find(&allJobs)
+    if len(allJobs) > 0 {
+      job := allJobs[0]
+      scheduleEnabled = false
+      scheduleName = job.Name
+      scheduleCron = job.CronExpr
     }
   }
 
@@ -130,8 +204,9 @@ func handleGetStatus(c *gin.Context) {
     "sources_count":    len(co.LogSources),
     "channels_count":   len(co.Notifications),
     "channels_enabled": enabledChannels,
-    "schedule_enabled": co.Schedule.Enabled,
-    "schedule_cron":    co.Schedule.CronExpr,
+    "schedule_enabled": scheduleEnabled,
+    "schedule_name":    scheduleName,
+    "schedule_cron":    scheduleCron,
     "next_run":         nextRun,
     "last_run":         lastRun,
     "last_status":      lastStatus,
@@ -177,28 +252,42 @@ func handleTestLLM(c *gin.Context) {
   }
   c.ShouldBindJSON(&req)
 
+  log.Printf("[test-llm] received index: %d", req.Index)
+
   var provider *LLMProvider
   if req.Index >= 0 {
     // 测试指定索引的提供商
     cfgMu.RLock()
+    log.Printf("[test-llm] cfg.LLMProviders length: %d", len(cfg.LLMProviders))
     if req.Index < len(cfg.LLMProviders) {
       provider = &cfg.LLMProviders[req.Index]
+      log.Printf("[test-llm] found provider: %s (id=%s)", provider.Name, provider.ID)
+    } else {
+      log.Printf("[test-llm] index %d out of range", req.Index)
     }
     cfgMu.RUnlock()
   } else {
     // 测试当前日志分析配置的提供商
-    provider = GetLLMProvider(cfg.LogAnalysis.LLMProvider)
+    cfgMu.RLock()
+    providerID := cfg.LogAnalysis.LLMProvider
+    cfgMu.RUnlock()
+    log.Printf("[test-llm] using log_analysis provider: %s", providerID)
+    provider = GetLLMProvider(providerID)
   }
 
   if provider == nil {
+    log.Printf("[test-llm] provider is nil, returning error")
     c.JSON(http.StatusOK, gin.H{"ok": false, "error": "LLM 未配置"})
     return
   }
+  log.Printf("[test-llm] calling LLM with provider: %s", provider.ID)
   reply, err := CallLLM(provider, cfg.LogAnalysis.LLMPrompt, "测试日志: [INFO] 系统运行正常", 1)
   if err != nil {
+    log.Printf("[test-llm] LLM call failed: %v", err)
     c.JSON(http.StatusOK, gin.H{"ok": false, "error": err.Error()})
     return
   }
+  log.Printf("[test-llm] LLM call succeeded")
   c.JSON(http.StatusOK, gin.H{"ok": true, "reply": truncate(reply, 200)})
 }
 

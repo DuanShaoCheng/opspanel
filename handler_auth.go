@@ -3,6 +3,7 @@ package main
 import (
   "fmt"
   "net/http"
+  "strconv"
 
   "github.com/gin-gonic/gin"
 )
@@ -77,7 +78,11 @@ func handleChangePassword(c *gin.Context) {
     c.JSON(http.StatusBadRequest, gin.H{"error": "原密码错误"})
     return
   }
-  hash, _ := HashPassword(req.NewPassword)
+  hash, err := HashPassword(req.NewPassword)
+  if err != nil {
+    c.JSON(http.StatusInternalServerError, gin.H{"error": "密码加密失败"})
+    return
+  }
   db.Model(&user).Update("password", hash)
   c.JSON(http.StatusOK, gin.H{"ok": true})
 }
@@ -98,7 +103,11 @@ func handleCreateUser(c *gin.Context) {
     c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误: " + err.Error()})
     return
   }
-  hash, _ := HashPassword(req.Password)
+  hash, err := HashPassword(req.Password)
+  if err != nil {
+    c.JSON(http.StatusInternalServerError, gin.H{"error": "密码加密失败"})
+    return
+  }
   user := User{Username: req.Username, Password: hash, Role: req.Role}
   if err := db.Create(&user).Error; err != nil {
     c.JSON(http.StatusConflict, gin.H{"error": "用户名已存在"})
@@ -108,7 +117,11 @@ func handleCreateUser(c *gin.Context) {
 }
 
 func handleUpdateUser(c *gin.Context) {
-  id := c.Param("id")
+  id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+  if err != nil {
+    c.JSON(http.StatusBadRequest, gin.H{"error": "无效的用户 ID"})
+    return
+  }
   var user User
   if err := db.First(&user, id).Error; err != nil {
     c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
@@ -123,7 +136,11 @@ func handleUpdateUser(c *gin.Context) {
     user.Role = req.Role
   }
   if req.Password != "" {
-    hash, _ := HashPassword(req.Password)
+    hash, err := HashPassword(req.Password)
+    if err != nil {
+      c.JSON(http.StatusInternalServerError, gin.H{"error": "密码加密失败"})
+      return
+    }
     user.Password = hash
   }
   db.Save(&user)
@@ -131,10 +148,14 @@ func handleUpdateUser(c *gin.Context) {
 }
 
 func handleDeleteUser(c *gin.Context) {
-  id := c.Param("id")
+  id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+  if err != nil {
+    c.JSON(http.StatusBadRequest, gin.H{"error": "无效的用户 ID"})
+    return
+  }
   // 不允许删除自己
   uid, _ := c.Get("uid")
-  if fmt.Sprintf("%v", uid) == id {
+  if fmt.Sprintf("%v", uid) == fmt.Sprintf("%d", id) {
     c.JSON(http.StatusBadRequest, gin.H{"error": "不能删除自己"})
     return
   }

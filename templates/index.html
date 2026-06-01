@@ -111,7 +111,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-
 .switch input:checked+.slider::before{left:22px}
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:200}
 .modal-overlay.show{display:flex}
-.modal{background:var(--card);border-radius:12px;padding:24px;width:90%;max-width:520px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);color:var(--text)}
+.modal{background:var(--card);border-radius:12px;padding:24px;width:90%;max-width:800px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);color:var(--text)}
 .modal-title{font-size:1rem;font-weight:600;margin-bottom:16px}
 .toast{position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:8px;color:#fff;font-size:.84rem;display:none;z-index:999;box-shadow:0 4px 12px rgba(0,0,0,.15)}
 .toast.show{display:block;animation:slideIn .3s}
@@ -121,7 +121,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-
 .history-table th{text-align:left;padding:10px 12px;border-bottom:2px solid var(--border);color:var(--text-secondary);font-weight:500}
 .history-table td{padding:10px 12px;border-bottom:1px solid var(--border);color:var(--text)}
 .history-table tr:hover td{background:var(--sidebar-active-bg)}
-.history-detail{background:var(--bg);padding:12px;border-radius:8px;margin-top:8px;font-size:.82rem;white-space:pre-wrap;max-height:300px;overflow-y:auto;color:var(--text-secondary)}
+.history-detail{background:var(--bg);padding:12px;border-radius:8px;margin-top:8px;font-size:.82rem;white-space:pre-wrap;word-break:break-all;max-height:500px;overflow-y:auto;color:var(--text-secondary)}
 .empty{text-align:center;padding:40px;color:var(--text-muted)}
 .empty-icon{font-size:2rem;margin-bottom:8px}
 .login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)}
@@ -235,7 +235,7 @@ function toggleSidebar(){
 function buildNav(){
   const nav=document.getElementById('sidebar-nav');
   const curPage=(location.hash||'#/').replace('#/','').split('/')[0]||'dashboard';
-  const logPages=['sources','collected','log-ai','log-notify','history'];
+  const logPages=['sources','collected','log-levels','log-ai','log-notify','history'];
   const logOpen=logPages.includes(curPage);
   let html='';
   // 仪表盘（顶级）
@@ -249,6 +249,7 @@ function buildNav(){
   const logItems=[
     {id:'sources',label:'日志源',icon:NAV_ICONS.sources},
     {id:'collected',label:'采集日志',icon:NAV_ICONS.history},
+    {id:'log-levels',label:'级别规则',icon:NAV_ICONS.sources},
     {id:'log-ai',label:'AI 配置',icon:NAV_ICONS.llm},
     {id:'log-notify',label:'推送配置',icon:NAV_ICONS.notifications},
     {id:'history',label:'推送记录',icon:NAV_ICONS.history},
@@ -283,7 +284,7 @@ function updateSidebar(){
 }
 
 // === Page titles ===
-const PAGE_TITLES={dashboard:'仪表盘',sources:'日志源',collected:'采集日志','log-ai':'AI 配置','log-notify':'推送配置',notifications:'通知渠道',issues:'问题列表',llm:'LLM',schedule:'定时任务',history:'推送记录',docs:'文档',users:'用户管理',settings:'设置'};
+const PAGE_TITLES={dashboard:'仪表盘',sources:'日志源',collected:'采集日志','log-levels':'级别规则','log-ai':'AI 配置','log-notify':'推送配置',notifications:'通知渠道',issues:'问题列表',llm:'LLM',schedule:'定时任务',history:'推送记录',docs:'文档',users:'用户管理',settings:'设置'};
 
 // === Login ===
 async function doLogin(){
@@ -340,6 +341,7 @@ function router(){
     case 'dashboard':renderDashboard(app);break;
     case 'sources':renderSources(app);break;
     case 'collected':renderCollected(app);break;
+    case 'log-levels':renderLevelRules(app);break;
     case 'log-ai':renderLogAI(app);break;
     case 'log-notify':renderLogNotify(app);break;
     case 'notifications':renderNotifications(app);break;
@@ -454,8 +456,7 @@ function renderLogAI(el){
         ${providers.length===0?`<p style="font-size:.76rem;color:var(--warning);margin-top:4px">请先在「系统 → LLM」中添加配置</p>`:''}
       </div>
       <div class="form-group"><label>提示词</label>
-        <textarea id="la-prompt" rows="6" ${isAdmin()?'':'disabled'} placeholder="你是服务器运维专家...">${esc(la.llm_prompt||'')}</textarea>
-        <p style="font-size:.76rem;color:var(--text-muted);margin-top:4px">要求 LLM 返回 JSON: {"score":1-10, "analysis":"说明"}</p>
+        <textarea id="la-prompt" rows="6" ${isAdmin()?'':'disabled'}>${esc(la.llm_prompt||'')}</textarea>
       </div>
       ${isAdmin()?`<div class="btn-group"><button class="btn btn-primary" onclick="saveLogAI()">保存</button></div>`:''}
     </div>`;
@@ -554,7 +555,7 @@ async function renderCollected(el){
           <td style="white-space:nowrap;font-size:.78rem">${esc(e.created_at||'').replace('T',' ').substring(0,19)}</td>
           <td><span class="tag" style="background:${levelColor(e.level)}">${esc(e.level)}</span></td>
           <td style="font-size:.78rem">${esc(e.host||'-')}</td>
-          <td style="font-size:.78rem">${esc(e.source)}</td>
+          <td style="font-size:.78rem">${esc(e.file||e.source.split('/').pop()||'-')}</td>
           <td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.82rem">${esc(e.content).substring(0,80)}</td>
           <td>${e.ai_score?`<b style="color:${scoreColor(e.ai_score)}">${e.ai_score}/10</b>`:'-'}</td>
           <td onclick="event.stopPropagation()" style="display:flex;gap:4px"><button class="btn btn-sm btn-outline" onclick="showLogDetail(${e.id})">详情</button>${isAdmin()?`<button class="btn btn-sm btn-danger" onclick="deleteLog(${e.id})">删除</button>`:''}</td>
@@ -636,20 +637,89 @@ async function analyzeLog(id){
   }catch(e){toast('分析失败',false);}
 }
 
+// === Level Rules ===
+function renderLevelRules(el){
+  const rules=CFG.level_rules||[];
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <p style="font-size:.82rem;color:var(--text-muted)">配置日志级别分类规则，按从上到下的优先级匹配。日志内容包含任一关键词即归入该级别，都不匹配则为 info。</p>
+      </div>
+      ${isAdmin()?`<button class="btn btn-primary" onclick="addLevelRule()">+ 添加级别</button>`:''}
+    </div>
+    ${rules.length?rules.map((r,i)=>`
+      <div class="list-item">
+        <div class="list-item-header">
+          <span class="list-item-title"><span class="tag" style="background:${levelColor(r.level)}">${esc(r.level)}</span></span>
+          <div class="list-item-actions">
+            ${isAdmin()?`<button class="btn btn-sm btn-outline" onclick="editLevelRule(${i})">编辑</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteLevelRule(${i})">删除</button>`:''}
+          </div>
+        </div>
+        <div class="list-item-meta">
+          关键词: ${r.keywords.map(k=>`<code>${esc(k)}</code>`).join(' ')}
+        </div>
+      </div>`).join(''):'<div class="empty"><div class="empty-icon">🏷️</div>暂无级别规则</div>'}`;
+}
+function addLevelRule(){
+  editLevelRule(-1);
+}
+function editLevelRule(idx){
+  const r=idx>=0?(CFG.level_rules||[])[idx]:{level:'',keywords:[]};
+  const title=idx>=0?'编辑级别规则':'添加级别规则';
+  showModal(title,`
+    <div class="form-group"><label>级别名称</label><input id="lr-level" value="${esc(r.level)}" placeholder="如 crash / error / warn"></div>
+    <div class="form-group"><label>关键词（每行一个）</label><textarea id="lr-keywords" rows="5" placeholder="crash\n崩溃\nfatal">${esc((r.keywords||[]).join('\n'))}</textarea></div>
+    <div class="btn-group"><button class="btn btn-primary" onclick="saveLevelRule(${idx})">保存</button><button class="btn btn-outline" onclick="closeModal()">取消</button></div>
+  `);
+}
+async function saveLevelRule(idx){
+  const level=document.getElementById('lr-level').value.trim();
+  if(!level){toast('请填写级别名称',false);return;}
+  const keywords=document.getElementById('lr-keywords').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!keywords.length){toast('请填写至少一个关键词',false);return;}
+  if(!CFG.level_rules)CFG.level_rules=[];
+  if(idx>=0){
+    CFG.level_rules[idx]={level,keywords};
+  }else{
+    CFG.level_rules.push({level,keywords});
+  }
+  await saveConfig();
+  closeModal();toast('已保存',true);router();
+}
+async function deleteLevelRule(idx){
+  if(!confirm('确定删除该级别规则？'))return;
+  CFG.level_rules.splice(idx,1);
+  await saveConfig();
+  toast('已删除',true);router();
+}
+
 // === Sources ===
 function renderSources(el){
   const list=CFG.log_sources||[];
+  const hostOpts=CFG.host_field_options||[];
   el.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
       <h2 class="page-title" style="margin:0">日志源</h2>
       ${isAdmin()?`<button class="btn btn-primary" onclick="editSource(-1)">+ 添加日志源</button>`:''}
     </div>
+    ${isAdmin()?`<div class="card" style="margin-bottom:16px">
+      <div class="card-header"><span class="card-title">服务器标识字段选项</span></div>
+      <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:8px">配置 Filebeat 日志源可选的服务器标识字段路径，添加后在日志源编辑中下拉选择</p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+        ${hostOpts.map((o,i)=>`<span class="tag" style="background:var(--bg);border:1px solid var(--border);padding:4px 8px;font-size:.78rem">${esc(o)} <span style="cursor:pointer;margin-left:4px;color:var(--danger)" onclick="removeHostFieldOpt(${i})">×</span></span>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px">
+        <input id="new-host-field-opt" placeholder="如 fields.server_id" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:.82rem;background:var(--card);color:var(--text)">
+        <button class="btn btn-sm btn-outline" onclick="addHostFieldOpt()">添加</button>
+      </div>
+    </div>`:''}
     ${list.length?list.map((s,i)=>`
       <div class="list-item">
         <div class="list-item-header">
           <span class="list-item-title">${esc(s.name)||'未命名'} ${fmtTag(s.type==='filebeat'?'filebeat':s.format)}</span>
           <div class="list-item-actions">
-            ${isAdmin()?`<button class="btn btn-sm btn-outline" onclick="testSource(${i})">测试</button>
+            ${isAdmin()?`${s.type!=='filebeat'?`<button class="btn btn-sm btn-outline" onclick="testSource(${i})">测试</button>`:``}
             <button class="btn btn-sm btn-outline" onclick="editSource(${i})">编辑</button>
             <button class="btn btn-sm btn-danger" onclick="deleteSource(${i})">删除</button>`:''}
           </div>
@@ -675,7 +745,9 @@ function editSource(idx){
       </div>
     </div>
     <div id="m-filebeat-wrap" style="display:${s.type==='filebeat'?'block':'none'}">
-      <div class="form-group"><label>服务器标识字段</label><input id="m-host-field" value="${esc(s.host_field||'host.name')}" placeholder="host.name"><p style="font-size:.72rem;color:var(--text-muted);margin-top:4px">Filebeat 文档中提取服务器标识的字段路径，如 host.name 或 fields.server_id</p></div>
+      <div class="form-group"><label>服务器标识字段</label><select id="m-host-field">
+        ${(CFG.host_field_options||[]).map(o=>`<option value="${esc(o)}" ${(s.host_field||'host.name')===o?'selected':''}>${esc(o)}</option>`).join('')}
+      </select></div>
     </div>
     <div class="form-group"><label>过滤正则</label><input id="m-filter" value="${esc(s.filter)}" placeholder="ERROR|CRASH|exception"></div>
     <div id="m-fmt-json" style="display:${s.format==='json'?'block':'none'}">
@@ -700,6 +772,21 @@ function toggleSourceFmt(){
   const v=document.getElementById('m-format').value;
   document.getElementById('m-fmt-json').style.display=v==='json'?'block':'none';
   document.getElementById('m-fmt-ml').style.display=v==='multiline'?'block':'none';
+}
+async function addHostFieldOpt(){
+  const input=document.getElementById('new-host-field-opt');
+  const v=input.value.trim();
+  if(!v)return;
+  if(!CFG.host_field_options)CFG.host_field_options=[];
+  if(CFG.host_field_options.includes(v)){toast('已存在',false);return;}
+  CFG.host_field_options.push(v);
+  await saveConfig();
+  toast('已添加',true);router();
+}
+async function removeHostFieldOpt(idx){
+  CFG.host_field_options.splice(idx,1);
+  await saveConfig();
+  toast('已删除',true);router();
 }
 async function saveSource(idx){
   const srcType=document.getElementById('m-srctype').value;
@@ -962,7 +1049,7 @@ function renderHistory(el){
     </div>
     <div class="card">
       ${list.length?`<table class="history-table"><thead><tr><th>时间</th><th>状态</th><th>摘要</th><th></th></tr></thead><tbody>
-        ${list.map((r,i)=>`<tr><td style="white-space:nowrap">${esc(r.time)}</td><td>${stTag(r.status)}</td><td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.summary||r.error||'—')}</td><td><button class="btn btn-sm btn-outline" onclick="showHistDetail(${i})">详情</button></td></tr>`).join('')}
+        ${list.map((r,i)=>`<tr><td style="white-space:nowrap">${esc(r.time)}</td><td>${stTag(r.status)}</td><td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.summary||r.error||'—')}</td><td><button class="btn btn-sm btn-outline" onclick="showHistDetail(${i})">详情</button>${isAdmin()?` <button class="btn btn-sm btn-danger" onclick="deleteHistItem(${i})">删除</button>`:''}</td></tr>`).join('')}
       </tbody></table>`:'<div class="empty"><div class="empty-icon">📭</div>暂无执行记录</div>'}
     </div>`;
 }
@@ -970,6 +1057,10 @@ async function clearHistory(){
   if(!confirm('确定清空所有推送记录？'))return;
   await api('/api/history',{method:'DELETE'});
   toast('已清空',true);await loadHistory();router();
+}
+async function deleteHistItem(idx){
+  await api('/api/history/'+idx,{method:'DELETE'});
+  toast('已删除',true);await loadHistory();router();
 }
 function showHistDetail(idx){
   const r=HISTORY[idx];

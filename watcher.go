@@ -90,7 +90,6 @@ func (w *Watcher) processFile(path string, src LogSource) {
     log.Printf("[watcher] tracking: %s (size=%d)", path, info.Size())
     return
   }
-  w.mu.Unlock()
 
   if info.Size() < fw.offset {
     // 文件被截断（轮转）
@@ -99,8 +98,22 @@ func (w *Watcher) processFile(path string, src LogSource) {
   }
 
   if info.Size() == fw.offset {
+    w.mu.Unlock()
     return
   }
+
+  offset := fw.offset
+  // 限制单次读取最大 1MB
+  readSize := info.Size() - offset
+  const maxRead = 1024 * 1024
+  if readSize > maxRead {
+    offset = info.Size() - maxRead
+    readSize = maxRead
+  }
+  fw.offset = info.Size()
+  filter := fw.filter
+  source := fw.source
+  w.mu.Unlock()
 
   // 读取新增内容
   f, err := os.Open(path)
@@ -109,29 +122,28 @@ func (w *Watcher) processFile(path string, src LogSource) {
   }
   defer f.Close()
 
-  f.Seek(fw.offset, 0)
-  buf := make([]byte, info.Size()-fw.offset)
+  f.Seek(offset, 0)
+  buf := make([]byte, readSize)
   n, _ := f.Read(buf)
-  fw.offset = info.Size()
 
   if n > 0 {
-    w.filterAndStore(string(buf[:n]), fw)
+    w.filterAndStore(string(buf[:n]), source, filepath.Base(path), filter)
   }
 }
 
-func (w *Watcher) filterAndStore(data string, fw *fileWatcher) {
+func (w *Watcher) filterAndStore(data string, source, file, filter string) {
   lines := strings.Split(data, "\n")
   for _, line := range lines {
     line = strings.TrimSpace(line)
     if line == "" {
       continue
     }
-    if fw.filter != "" && !matchFilter(line, fw.filter) {
+    if filter != "" && !matchFilter(line, filter) {
       continue
     }
     entry := LogEntry{
-      Source:  fw.source,
-      File:    filepath.Base(fw.path),
+      Source:  source,
+      File:    file,
       Content: line,
       Level:   classifyLevel(line),
     }

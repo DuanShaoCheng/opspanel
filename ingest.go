@@ -4,6 +4,7 @@ import (
   "bufio"
   "encoding/json"
   "fmt"
+  "io"
   "log"
   "net/http"
   "path/filepath"
@@ -44,6 +45,7 @@ const bufferSize = 10
 func InitIngest() {
   ingestBuffer = &lineBuffer{buffers: make(map[string]*fileBuffer)}
   reloadIngestFilter()
+  go ingestBuffer.cleanupLoop()
   log.Println("[ingest] initialized")
 }
 
@@ -68,9 +70,11 @@ func reloadIngestFilter() {
 }
 
 func RegisterIngestRoutes(r *gin.Engine) {
-  r.POST("/_bulk", handleBulk)
-  r.PUT("/:index/_bulk", handleBulk)
-  r.POST("/:index/_bulk", handleBulk)
+  ingest := r.Group("", IngestAuthMiddleware())
+  ingest.POST("/_bulk", handleBulk)
+  ingest.PUT("/:index/_bulk", handleBulk)
+  ingest.POST("/:index/_bulk", handleBulk)
+
   r.GET("/", handleESRoot)
   r.PUT("/:index", handleESCreateIndex)
   r.HEAD("/:index", handleESHeadIndex)
@@ -149,10 +153,15 @@ func handleBulk(c *gin.Context) {
 }
 
 func handleIngest(c *gin.Context) {
+  body, err := io.ReadAll(c.Request.Body)
+  if err != nil {
+    c.JSON(http.StatusBadRequest, gin.H{"error": "read body failed"})
+    return
+  }
   var docs []map[string]interface{}
-  if err := c.ShouldBindJSON(&docs); err != nil {
+  if err := json.Unmarshal(body, &docs); err != nil {
     var single map[string]interface{}
-    if err2 := json.NewDecoder(c.Request.Body).Decode(&single); err2 != nil {
+    if err2 := json.Unmarshal(body, &single); err2 != nil {
       c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
       return
     }
@@ -267,6 +276,14 @@ func (lb *lineBuffer) cleanup() {
     if len(fb.lines) > 0 && time.Since(fb.lines[len(fb.lines)-1].ts) > 5*time.Minute {
       delete(lb.buffers, key)
     }
+  }
+}
+
+func (lb *lineBuffer) cleanupLoop() {
+  ticker := time.NewTicker(30 * time.Second)
+  defer ticker.Stop()
+  for range ticker.C {
+    lb.cleanup()
   }
 }
 

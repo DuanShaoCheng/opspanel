@@ -12,12 +12,20 @@ import (
 
 // Config 全局配置
 type Config struct {
-	LogSources    []LogSource       `json:"log_sources"`
-	Notifications []Notification    `json:"notifications"`
-	LLMProviders  []LLMProvider     `json:"llm_providers"`
-	Schedule      ScheduleConfig    `json:"schedule"`
-	SMTP          SMTPConfig        `json:"smtp"`
-	LogAnalysis   LogAnalysisConfig `json:"log_analysis"`
+	LogSources       []LogSource       `json:"log_sources"`
+	Notifications    []Notification    `json:"notifications"`
+	LLMProviders     []LLMProvider     `json:"llm_providers"`
+	Schedule         ScheduleConfig    `json:"schedule"`
+	SMTP             SMTPConfig        `json:"smtp"`
+	LogAnalysis      LogAnalysisConfig `json:"log_analysis"`
+	HostFieldOptions []string          `json:"host_field_options"`
+	LevelRules       []LevelRule       `json:"level_rules"`
+}
+
+// LevelRule 日志级别分类规则
+type LevelRule struct {
+	Level    string   `json:"level"`
+	Keywords []string `json:"keywords"`
 }
 
 // LogAnalysisConfig 日志分析模块配置
@@ -121,6 +129,16 @@ func DefaultConfig() *Config {
 			LogHours: 24,
 			MaxBytes: 12000,
 		},
+		HostFieldOptions: []string{"fields.server_id", "host.name", "agent.hostname"},
+		LevelRules: DefaultLevelRules(),
+	}
+}
+
+func DefaultLevelRules() []LevelRule {
+	return []LevelRule{
+		{Level: "crash", Keywords: []string{"crash", "崩溃", "crasher"}},
+		{Level: "error", Keywords: []string{"error", "错误", "fatal"}},
+		{Level: "warn", Keywords: []string{"warn", "warning", "警告"}},
 	}
 }
 
@@ -139,6 +157,12 @@ func LoadConfig() *Config {
 	}
 	if c.Schedule.CronExpr == "" {
 		c.Schedule.CronExpr = "0 9 * * *"
+	}
+	if len(c.HostFieldOptions) == 0 {
+		c.HostFieldOptions = []string{"fields.server_id", "host.name", "agent.hostname"}
+	}
+	if len(c.LevelRules) == 0 {
+		c.LevelRules = DefaultLevelRules()
 	}
 	return c
 }
@@ -275,19 +299,21 @@ type SMTPConfig struct {
 	From     string `json:"from"`
 }
 
-// GetLLMProvider 根据 ID 获取 LLM 配置
+// GetLLMProvider 根据 ID 获取 LLM 配置（返回拷贝）
 func GetLLMProvider(id string) *LLMProvider {
 	cfgMu.RLock()
 	defer cfgMu.RUnlock()
 	if id != "" {
 		for i := range cfg.LLMProviders {
 			if cfg.LLMProviders[i].ID == id {
-				return &cfg.LLMProviders[i]
+				p := cfg.LLMProviders[i]
+				return &p
 			}
 		}
 	}
 	if len(cfg.LLMProviders) > 0 {
-		return &cfg.LLMProviders[0]
+		p := cfg.LLMProviders[0]
+		return &p
 	}
 	return nil
 }

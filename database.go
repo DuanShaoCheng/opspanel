@@ -39,7 +39,7 @@ func InitDatabase() {
   }
 
   // Auto-migrate
-  if err := db.AutoMigrate(&User{}); err != nil {
+  if err := db.AutoMigrate(&User{}, &LogEntry{}, &Job{}); err != nil {
     log.Fatalf("[database] migrate failed: %v", err)
   }
 

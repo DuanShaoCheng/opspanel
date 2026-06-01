@@ -89,7 +89,8 @@ func sendFeishu(webhook, secret, title, body string) error {
 }
 
 func feishuSign(timestamp, secret string) string {
-	h := hmac.New(sha256.New, []byte(timestamp+"\n"+secret))
+	stringToSign := timestamp + "\n" + secret
+	h := hmac.New(sha256.New, []byte(stringToSign))
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
 
@@ -152,9 +153,11 @@ func sendGenericWebhook(webhook, title, body string) error {
 }
 
 // === 公共 ===
+var httpClient = &http.Client{Timeout: 15 * time.Second}
+
 func postJSON(url string, payload interface{}) error {
 	data, _ := json.Marshal(payload)
-	resp, err := http.Post(url, "application/json", bytes.NewReader(data))
+	resp, err := httpClient.Post(url, "application/json", bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}

@@ -69,7 +69,11 @@ func handleGetLogs(c *gin.Context) {
 }
 
 func handleGetLogDetail(c *gin.Context) {
-  id := c.Param("id")
+  id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+  if err != nil {
+    c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+    return
+  }
   var entry LogEntry
   if err := db.First(&entry, id).Error; err != nil {
     c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -79,7 +83,11 @@ func handleGetLogDetail(c *gin.Context) {
 }
 
 func handleAnalyzeLog(c *gin.Context) {
-  id := c.Param("id")
+  id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+  if err != nil {
+    c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+    return
+  }
   var entry LogEntry
   if err := db.First(&entry, id).Error; err != nil {
     c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -182,8 +190,13 @@ func handleClearLogs(c *gin.Context) {
 }
 
 func handleDeleteLog(c *gin.Context) {
-  id := c.Param("id")
-  if err := db.Delete(&LogEntry{}, id).Error; err != nil {
+  id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+  if err != nil {
+    c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+    return
+  }
+  result := db.Delete(&LogEntry{}, id)
+  if result.RowsAffected == 0 {
     c.JSON(http.StatusNotFound, gin.H{"error": "日志不存在"})
     return
   }

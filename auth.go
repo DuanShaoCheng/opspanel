@@ -1,7 +1,10 @@
 package main
 
 import (
+  "crypto/rand"
+  "encoding/hex"
   "errors"
+  "log"
   "os"
   "time"
 
@@ -12,10 +15,18 @@ import (
 
 var jwtSecret []byte
 
+func generateRandomSecret(n int) string {
+  b := make([]byte, n)
+  rand.Read(b)
+  return hex.EncodeToString(b)
+}
+
 func InitJWTSecret() {
   secret := os.Getenv("JWT_SECRET")
   if secret == "" {
-    secret = "opspanel-default-secret-change-me"
+    // 未设置时自动生成随机 secret 并警告
+    secret = generateRandomSecret(32)
+    log.Printf("[auth] WARNING: JWT_SECRET not set, using auto-generated secret (tokens will invalidate on restart)")
   }
   jwtSecret = []byte(secret)
 }

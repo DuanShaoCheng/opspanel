@@ -1,11 +1,15 @@
 package main
 
 import (
+  "context"
   "embed"
   "log"
   "net/http"
   "os"
+  "os/signal"
+  "syscall"
   "time"
+  "unicode/utf8"
 
   "github.com/gin-gonic/gin"
   "github.com/robfig/cron/v3"
@@ -28,7 +32,9 @@ func main() {
   log.SetFlags(log.LstdFlags | log.Lshortfile)
   log.Println("[opspanel] starting...")
 
-  os.MkdirAll(dataDir, 0755)
+  if err := os.MkdirAll(dataDir, 0755); err != nil {
+    log.Fatalf("[opspanel] failed to create data dir: %v", err)
+  }
 
   // 初始化数据库和 JWT
   InitDatabase()
@@ -79,8 +85,27 @@ func main() {
   RegisterLogRoutes(api)
   RegisterSchedulerRoutes(api)
 
-  log.Printf("[opspanel] listening on %s", listenAddr)
-  log.Fatal(r.Run(listenAddr))
+  // Graceful shutdown
+  srv := &http.Server{Addr: listenAddr, Handler: r}
+  go func() {
+    log.Printf("[opspanel] listening on %s", listenAddr)
+    if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+      log.Fatalf("[opspanel] listen failed: %v", err)
+    }
+  }()
+
+  quit := make(chan os.Signal, 1)
+  signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+  <-quit
+  log.Println("[opspanel] shutting down...")
+
+  cronScheduler.Stop()
+  watcher.Stop()
+
+  ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+  defer cancel()
+  srv.Shutdown(ctx)
+  log.Println("[opspanel] stopped")
 }
 
 func serveIndex(c *gin.Context) {
@@ -124,6 +149,10 @@ func today() string { return time.Now().Format("2006-01-02") }
 func truncate(s string, n int) string {
   if len(s) <= n {
     return s
+  }
+  // 找到安全的 UTF-8 截断点
+  for n > 0 && !utf8.RuneStart(s[n]) {
+    n--
   }
   return s[:n] + "..."
 }

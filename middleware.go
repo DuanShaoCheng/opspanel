@@ -2,6 +2,7 @@ package main
 
 import (
   "net/http"
+  "os"
   "strings"
 
   "github.com/gin-gonic/gin"
@@ -34,6 +35,31 @@ func AdminOnly() gin.HandlerFunc {
     role, _ := c.Get("role")
     if role != "admin" {
       c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "权限不足"})
+      return
+    }
+    c.Next()
+  }
+}
+
+// IngestAuthMiddleware Ingest 端点认证中间件
+// 通过环境变量 INGEST_API_KEY 设置，未设置时允许所有请求（向后兼容）
+func IngestAuthMiddleware() gin.HandlerFunc {
+  apiKey := os.Getenv("INGEST_API_KEY")
+  return func(c *gin.Context) {
+    if apiKey == "" {
+      c.Next()
+      return
+    }
+    key := c.GetHeader("X-API-Key")
+    if key == "" {
+      // 也支持 Authorization: ApiKey <key> 格式
+      auth := c.GetHeader("Authorization")
+      if strings.HasPrefix(auth, "ApiKey ") {
+        key = strings.TrimPrefix(auth, "ApiKey ")
+      }
+    }
+    if key != apiKey {
+      c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid api key"})
       return
     }
     c.Next()
